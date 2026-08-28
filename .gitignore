@@ -21,6 +21,10 @@ tmp/
 *.mp3
 *.m4a
 
+# 학습된 모델(용량 큼 — 저장소에 올리지 않음)
+backend/models/
+*.safetensors
+
 # 데이터 전처리 산출물(생성물 — 스크립트로 재생성)
 data/processed/
 data/sample_raw/
