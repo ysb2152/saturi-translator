@@ -112,8 +112,9 @@ class DialectConverter:
             return self._rule_convert(dialect_text)
         import torch
 
+        # KoBART 토크나이저의 token_type_ids는 BART generate가 받지 않으므로 제외
         enc = self._tok(dialect_text, return_tensors="pt", truncation=True,
-                        max_length=128).to(config.CONVERTER_DEVICE)
+                        max_length=128, return_token_type_ids=False).to(config.CONVERTER_DEVICE)
         with torch.no_grad():
             gen = self._model.generate(**enc, max_length=128, num_beams=4)
         return self._tok.batch_decode(gen, skip_special_tokens=True)[0].strip()
