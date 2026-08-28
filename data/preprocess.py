@@ -28,26 +28,31 @@ from wav_utils import slice_wav, wav_duration
 AUDIO_EXTS = [".wav", ".WAV"]
 
 
-def find_session_audio(label_path: Path, obj: dict, raw_root: Path) -> Path | None:
-    """라벨에 대응하는 세션 오디오 파일을 찾는다."""
-    # 1) 메타데이터에 명시된 경로
+def build_audio_index(raw_root: Path) -> dict[str, Path]:
+    """raw 전체를 '한 번만' 훑어 오디오 basename(소문자) → 경로 맵을 만든다.
+
+    라벨 파일마다 rglob 하면 O(n^2)라 파일이 많을 때 매우 느리다. 인덱스로 dict 조회.
+    """
+    idx: dict[str, Path] = {}
+    for ext in ("*.wav", "*.WAV"):
+        for p in raw_root.rglob(ext):
+            idx.setdefault(p.name.lower(), p)
+    return idx
+
+
+def find_session_audio(label_path: Path, obj: dict, audio_index: dict[str, Path]) -> Path | None:
+    """라벨에 대응하는 세션 오디오를 인덱스에서 찾는다(basename 기준)."""
+    if not audio_index:
+        return None
+    # 1) 메타데이터에 명시된 파일명
     name = get_session_audio_name(obj)
-    if name:
-        cand = (raw_root / name)
-        if cand.exists():
-            return cand
-        # 파일명만 주어졌을 수 있으니 raw 전체에서 basename 매칭
-        hits = list(raw_root.rglob(Path(name).name))
-        if hits:
-            return hits[0]
-    # 2) 라벨 파일명과 같은 basename 의 오디오
+    if name and Path(name).name.lower() in audio_index:
+        return audio_index[Path(name).name.lower()]
+    # 2) 라벨 파일명과 같은 basename
     for ext in AUDIO_EXTS:
-        cand = label_path.with_suffix(ext)
-        if cand.exists():
-            return cand
-        hits = list(raw_root.rglob(label_path.stem + ext))
-        if hits:
-            return hits[0]
+        key = (label_path.stem + ext).lower()
+        if key in audio_index:
+            return audio_index[key]
     return None
 
 
@@ -77,6 +82,10 @@ def main():
     if not label_files:
         raise SystemExit(f"라벨 JSON을 찾지 못했습니다: {raw_root}/{args.labels_glob}")
 
+    # 오디오 인덱스를 한 번만 구축(라벨만 있으면 비어 있음 → STT는 자연히 skip)
+    audio_index = build_audio_index(raw_root)
+    print(f"라벨 {len(label_files)}개, 오디오 {len(audio_index)}개 인덱싱 완료")
+
     rng = random.Random(args.seed)
     # 세션(라벨 파일) 단위로 train/val 분할 → 화자/세션 누수 방지
     val_set = set(f for f in label_files if rng.random() < args.val_ratio)
@@ -98,7 +107,7 @@ def main():
             continue
 
         utts = get_utterance_list(obj)
-        session_audio = None if args.no_slice else find_session_audio(lf, obj, raw_root)
+        session_audio = None if args.no_slice else find_session_audio(lf, obj, audio_index)
 
         for i, raw_utt in enumerate(utts):
             stats["utterances"] += 1
@@ -116,7 +125,7 @@ def main():
             audio_path, dur = None, u.duration
             if args.no_slice:
                 # 발화 단위 오디오: 라벨 stem 또는 utterance id 로 매칭 시도
-                cand = find_session_audio(lf, obj, raw_root)
+                cand = find_session_audio(lf, obj, audio_index)
                 if cand:
                     audio_path = cand
                     dur = dur or wav_duration(cand)
