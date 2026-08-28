@@ -60,12 +60,12 @@ class Transcriber:
 class DialectConverter:
     """사투리 텍스트 → 표준어 텍스트.
 
-    지금은 파인튜닝 모델이 없으므로 아주 얕은 규칙 사전으로 동작하는 '스텁'.
-    E2E 파이프라인이 도는 것을 확인하는 용도이며, 2단계에서 KoBART/T5 seq2seq
-    모델로 이 클래스만 교체하면 된다(convert 시그니처 유지).
+    config.CONVERTER_MODEL_DIR 이 설정돼 있으면 파인튜닝한 KoBART seq2seq 모델로 추론하고,
+    없으면 얕은 규칙 사전(스텁)으로 폴백한다. 모델은 첫 사용 시 지연 로딩.
+    학습은 notebooks/kobart_finetune.ipynb 참고.
     """
 
-    # 데모용 최소 사전. 실제 개선은 AI Hub 데이터로 학습한 모델이 담당.
+    # 규칙 폴백용 최소 사전(모델 없을 때만 사용).
     _RULES = {
         "머라카노": "뭐라고 하니",
         "머라꼬": "뭐라고",
@@ -79,11 +79,44 @@ class DialectConverter:
         "뭐라는겨": "뭐라는 거야",
     }
 
-    def convert(self, dialect_text: str) -> str:
-        text = dialect_text
+    def __init__(self) -> None:
+        self._model = None
+        self._tok = None
+
+    def _load(self):
+        """KoBART 모델/토크나이저 지연 로딩. 실패하면 규칙 폴백."""
+        if self._model is not None or not config.CONVERTER_MODEL_DIR:
+            return
+        try:
+            import torch  # noqa: F401
+            from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+            logger.info("변환 모델 로딩: %s", config.CONVERTER_MODEL_DIR)
+            self._tok = AutoTokenizer.from_pretrained(config.CONVERTER_MODEL_DIR)
+            self._model = AutoModelForSeq2SeqLM.from_pretrained(config.CONVERTER_MODEL_DIR)
+            self._model.to(config.CONVERTER_DEVICE).eval()
+        except Exception as e:  # 로딩 실패 → 규칙 폴백
+            logger.warning("변환 모델 로딩 실패(규칙 스텁으로 폴백): %s", e)
+            self._model = None
+
+    def _rule_convert(self, text: str) -> str:
         for dia, std in self._RULES.items():
             text = text.replace(dia, std)
         return text
+
+    def convert(self, dialect_text: str) -> str:
+        if not dialect_text:
+            return dialect_text
+        self._load()
+        if self._model is None:  # 모델 없음/실패 → 규칙
+            return self._rule_convert(dialect_text)
+        import torch
+
+        enc = self._tok(dialect_text, return_tensors="pt", truncation=True,
+                        max_length=128).to(config.CONVERTER_DEVICE)
+        with torch.no_grad():
+            gen = self._model.generate(**enc, max_length=128, num_beams=4)
+        return self._tok.batch_decode(gen, skip_special_tokens=True)[0].strip()
 
 
 class Pipeline:

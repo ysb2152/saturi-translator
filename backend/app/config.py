@@ -20,6 +20,10 @@ WHISPER_COMPUTE_TYPE = os.getenv(
 # 인식 언어(한국어 고정)
 LANGUAGE = os.getenv("LANGUAGE", "ko")
 
+# 2단계 변환 모델(KoBART) 디렉터리. 있으면 규칙 스텁 대신 이 모델로 추론.
+CONVERTER_MODEL_DIR = os.getenv("CONVERTER_MODEL_DIR", "").strip()
+CONVERTER_DEVICE = os.getenv("CONVERTER_DEVICE", "cpu")  # cpu / cuda
+
 # 업로드 임시 파일 저장 위치
 TMP_DIR = Path(os.getenv("TMP_DIR", Path(__file__).resolve().parent.parent / "tmp"))
 TMP_DIR.mkdir(parents=True, exist_ok=True)
