@@ -116,7 +116,9 @@ class DialectConverter:
         enc = self._tok(dialect_text, return_tensors="pt", truncation=True,
                         max_length=128, return_token_type_ids=False).to(config.CONVERTER_DEVICE)
         with torch.no_grad():
-            gen = self._model.generate(**enc, max_length=128, num_beams=4)
+            gen = self._model.generate(
+                **enc, max_new_tokens=64, num_beams=4,
+                no_repeat_ngram_size=3, repetition_penalty=1.3, early_stopping=True)
         return self._tok.batch_decode(gen, skip_special_tokens=True)[0].strip()
 
 
