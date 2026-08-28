@@ -60,6 +60,26 @@ AI Hub 방언 데이터는 연도/지역별로 필드명이 다르다. 이 전�
 - 전사 마커(`(A)/(B)` 이중전사, `{웃음}`, `(())`, 어절 뒤 `b/`·`l/` 등)는
   [`clean_text`](aihub_schema.py)가 정제. 방언/표준 각각 다른 쪽을 선택.
 
+## 대용량 음성(STT): 스트리밍 전처리 — 외장하드 없이
+
+원천(음성) zip은 하나가 17~28GB라 압축을 다 풀면 로컬 34GB에 안 들어간다.
+`preprocess_streaming.py`는 **zip을 통째로 풀지 않고** WAV를 하나씩 꺼내(temp) →
+발화 구간으로 잘라 작은 클립 저장 → temp 삭제, 를 반복한다. 피크 디스크 =
+zip 크기 + temp WAV 1개 + 누적 클립.
+
+```bash
+# 라벨(전사)은 먼저 따로 받아 풀어둔다(작음) → data/raw_label
+python data/preprocess_streaming.py \
+    --zip "(비식별화완료)경상도_1.zip" \
+    --labels data/raw_label \
+    --out data/processed \
+    --max-clips 20000        # 포트폴리오용 소량만(0=무제한)
+```
+
+- `--max-clips` 로 개수를 제한하면 클립 몇 GB만 남아 **무료 Google Drive**에 올려 Colab 학습 가능.
+- 음성 zip이 여러 개면 두 번째부터 `--append` 로 이어쓰기(분할은 세션 해시라 일관).
+- 검증: `python data/test_streaming.py` (합성 zip으로 E2E).
+
 ## 파일 구성
 
 | 파일 | 역할 |
@@ -67,8 +87,11 @@ AI Hub 방언 데이터는 연도/지역별로 필드명이 다르다. 이 전�
 | `aihub_schema.py` | 라벨 파싱 + 전사 정제(필드 매핑은 여기 `FIELDS`) |
 | `wav_utils.py` | PCM WAV 길이 계산·구간 슬라이스(표준 라이브러리) |
 | `preprocess.py` | 메인: raw → STT 매니페스트 + 변환 문장쌍 + `stats.json` |
+| `preprocess_streaming.py` | 대용량 음성 zip을 안 풀고 스트리밍 처리(외장하드 없이) |
+| `build_mt_dataset.py` | 변환 학습셋 구성(중복 제거 + 동일쌍 다운샘플링) |
+| `analyze.py` | 데이터 EDA → `analysis.md` |
 | `make_sample.py` | 검증용 합성 샘플 생성 |
-| `test_preprocess.py` | 스모크 테스트(정제·추출·E2E) |
+| `test_preprocess.py`, `test_streaming.py` | 스모크 테스트 |
 
 ## 다음 단계
 
