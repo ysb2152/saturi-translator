@@ -20,3 +20,9 @@ tmp/
 *.wav
 *.mp3
 *.m4a
+
+# 데이터 전처리 산출물(생성물 — 스크립트로 재생성)
+data/processed/
+data/sample_raw/
+data/raw/
+__pycache__/

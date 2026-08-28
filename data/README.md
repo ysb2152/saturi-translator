@@ -1,0 +1,68 @@
+# data — AI Hub 방언 데이터 전처리
+
+AI Hub "한국어 방언 발화" 데이터를 학습용 산출물로 변환한다.
+
+- **STT 매니페스트** (`processed/stt/{train,val}.jsonl`): Whisper 파인튜닝용
+  `{"audio_filepath", "text"(=방언 전사), "duration"}`
+- **변환 문장쌍** (`processed/mt/{train,val}.jsonl`): KoBART/T5 파인튜닝용
+  `{"dialect", "standard"}`
+
+## 지금 바로 검증 (실제 데이터 불필요)
+
+```bash
+python data/test_preprocess.py
+```
+합성 샘플 생성 → 전처리 → 산출물 검증까지 한 번에 돈다. 파이프라인이 도는지 먼저 확인용.
+
+## 실제 데이터로 실행
+
+1. AI Hub에서 데이터 다운로드 (계정·승인·수동)
+   - 예: [한국어 방언 발화(경상도)](https://www.aihub.or.kr/aihubdata/data/view.do?dataSetSn=119),
+     [전라도](https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=120),
+     [충청도](https://www.aihub.or.kr/aihubdata/data/view.do?dataSetSn=122)
+   - 압축 해제 후 라벨 JSON + 오디오(WAV)가 있는 루트를 준비.
+2. 전처리 실행
+   ```bash
+   python data/preprocess.py --raw <추출_루트> --out data/processed --val-ratio 0.05
+   ```
+   - 오디오가 **세션 단위**(긴 파일 + 발화 start/end)면 기본 동작으로 발화별 클립을 잘라 저장.
+   - 오디오가 **이미 발화 단위**면 `--no-slice` 추가.
+   - 디버그: `--limit 20` 으로 라벨 20개만.
+
+## ⚠️ 라벨 스키마는 데이터셋마다 조금 다르다
+
+AI Hub 방언 데이터는 연도/지역별로 필드명이 다르다. 이 전처리는 흔한 구조를 기본값으로 두고
+없는 필드는 순차 대체하도록 짰지만, **실제 파일을 받으면 라벨 JSON 하나를 열어
+[`aihub_schema.py`](aihub_schema.py)의 `FIELDS`가 맞는지 확인**하는 것이 가장 확실하다.
+
+가정하는 구조(요약):
+```json
+{
+  "metadata": { "audioPath": "audio/xxx.wav" },
+  "utterance": [
+    { "dialect_form": "가가 억수로 머라카노",
+      "standard_form": "그 아이가 굉장히 뭐라고 하니",
+      "eojeolList": [ {"eojeol":"가가","standard":"그 아이가","isDialect":true} ],
+      "start": 0.0, "end": 2.4 }
+  ]
+}
+```
+- 문장 필드(`dialect_form`/`standard_form`)가 없으면 `eojeolList`로 조립, 그것도 없으면 `form` 사용.
+- 전사 마커(`(A)/(B)` 이중전사, `{웃음}`, `(())`, 어절 뒤 `b/`·`l/` 등)는
+  [`clean_text`](aihub_schema.py)가 정제. 방언/표준 각각 다른 쪽을 선택.
+
+## 파일 구성
+
+| 파일 | 역할 |
+|------|------|
+| `aihub_schema.py` | 라벨 파싱 + 전사 정제(필드 매핑은 여기 `FIELDS`) |
+| `wav_utils.py` | PCM WAV 길이 계산·구간 슬라이스(표준 라이브러리) |
+| `preprocess.py` | 메인: raw → STT 매니페스트 + 변환 문장쌍 + `stats.json` |
+| `make_sample.py` | 검증용 합성 샘플 생성 |
+| `test_preprocess.py` | 스모크 테스트(정제·추출·E2E) |
+
+## 다음 단계
+
+- STT: `processed/stt/*.jsonl` 로 Whisper 파인튜닝(Colab). 표준 Whisper 대비 CER/WER 비교.
+- 변환: `processed/mt/*.jsonl` 로 KoBART seq2seq 파인튜닝 → 백엔드 `DialectConverter` 교체.
+- WAV가 아닌 포맷이면 `wav_utils`가 슬라이스 못 하므로, ffmpeg로 16kHz mono WAV 변환 후 사용 권장.
