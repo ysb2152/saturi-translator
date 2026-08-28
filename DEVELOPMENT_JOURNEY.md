@@ -4,7 +4,7 @@
 
 - 프로젝트: 사투리 → 표준어 음성 번역 안드로이드 앱. 사투리 음성을 녹음하면 표준어 텍스트로 바꿔 준다.
 - 스택: React Native(Expo) 프론트, FastAPI + Python 백엔드, faster-whisper(STT), KoBART/T5 계열(사투리→표준어 변환, 예정), AI Hub 한국어 방언 데이터, Colab/Kaggle 무료 GPU 학습.
-- 저장소: 아직 git 미설정(로컬 개발 중).
+- 저장소: https://github.com/ysb2152/translate (public, 임시명 `translate`. backend/mobile 모노 구조).
 
 ---
 
@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-08-28 | chore | GitHub 공개 저장소 `translate` 생성·푸시(WTGMate처럼 코드와 함께 개발기록 관리). Expo 내부 .git이 서브모듈로 잡히던 문제 정리 | B-6 |
 | 2026-08-28 | design | 스타일 5방향 탐색 후 **"한지 × 클린 하이브리드"** 채택, `App.js` 재구현(한지빛 배경·먹색 세리프·청록 포인트·View 마이크·클린 결과카드) | B-5 |
 | 2026-08-28 | chore | 범위 확장 반영: 앱 카피에서 "경상도" 제거 → **전국 사투리** 대상으로 일반화 | B-5 |
 | 2026-08-28 | fix | 업로드 실패(`unsupported FormDataPart`) 원인 규명 후 `expo-file-system`의 `File.upload`(multipart)로 해결, 왕복 실측 확인 | B-4 |
@@ -102,9 +103,13 @@ STT 추론 엔진은 faster-whisper(CTranslate2)로 정했습니다. 개발 PC�
 
 구현에서는 앱 용량·의존성을 아끼려 정확한 Gowun Batang 대신 안드로이드 기본 세리프(`fontFamily: 'serif'` → Noto Serif CJK)로 한글 세리프 느낌을 냈고, 마이크 아이콘도 이모지 대신 View로 그려 의존성 0으로 유지했습니다. 녹음 중에는 주칠색과 펄스 링으로 상태를 드러냅니다. 이와 함께 프로젝트 범위가 전국 사투리로 넓어진 것을 반영해, 앱 카피에서 "경상도"를 빼고 "전국 사투리"·"사투리로 말하면 표준어로" 기준으로 문구를 일반화했습니다.
 
----
+## B-6. GitHub 저장소 구성
 
-# Part C. 배운 것과 로드맵
+코드와 개발기록을 함께 관리하려고(WTGMate와 같은 방식) GitHub 공개 저장소 `translate`(임시명)를 만들었습니다. backend/mobile 모노 구조 그대로 올리고, 이후 이 `DEVELOPMENT_JOURNEY.md`를 커밋과 함께 갱신합니다.
+
+첫 커밋에서 함정이 하나 있었습니다. `create-expo-app`이 `mobile/`을 만들 때 내부에 자체 `.git`을 초기화해 둬서, 루트에서 `git add`를 하면 `mobile`이 파일이 아니라 서브모듈(gitlink, mode 160000)로 잡혔습니다. 이대로 올리면 앱 소스가 빠집니다. `mobile/.git`을 제거하고 인덱스의 gitlink를 강제로 지운 뒤(`git rm --cached -f mobile`) 다시 추가해 앱 소스를 정상 포함시켰습니다. 무거운 산출물(node_modules, .venv, tmp, dist)은 루트와 하위 `.gitignore`로 제외했습니다.
+
+
 
 ## C-1. 개발하며 굳어진 관점
 
@@ -122,6 +127,7 @@ STT 추론 엔진은 faster-whisper(CTranslate2)로 정했습니다. 개발 PC�
 - [x] 개발용 안드로이드 에뮬레이터 환경 (B-3)
 - [x] 업로드 경로 버그 해결 (B-4)
 - [x] 디자인 방향 확정과 1차 구현 (B-5)
+- [x] GitHub 공개 저장소 구성 (B-6)
 - [ ] AI Hub 한국어 방언 데이터 다운로드·전처리 스크립트
 - [ ] Whisper 파인튜닝(표준 대비 인식률 개선 측정)과 CTranslate2 변환 연결
 - [ ] 규칙 스텁 → KoBART/T5 사투리→표준어 변환 모델
