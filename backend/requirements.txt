@@ -1,0 +1,14 @@
+# FastAPI 서버
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# STT: faster-whisper (내부에 오디오 디코더 번들 → 시스템 ffmpeg 불필요)
+faster-whisper==1.1.1
+requests==2.32.3
+
+# 2단계 텍스트 변환(사투리→표준어) 파인튜닝/추론용.
+# 지금 뼈대 단계에서는 스텁 변환기를 쓰므로 무거운 torch는 주석 처리해 둠.
+# STT 파인튜닝/KoBART 변환을 로컬에서 돌릴 때 주석 해제:
+# torch==2.5.1
+# transformers==4.47.1

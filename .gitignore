@@ -1,0 +1,22 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+dist-check*/
+
+# 임시/모델 산출물
+tmp/
+*.wav
+*.mp3
+*.m4a
