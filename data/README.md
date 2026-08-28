@@ -14,9 +14,18 @@ python data/test_preprocess.py
 ```
 합성 샘플 생성 → 전처리 → 산출물 검증까지 한 번에 돈다. 파이프라인이 도는지 먼저 확인용.
 
+## ⚠️ 지오블록: AI Hub는 해외 IP 다운로드를 차단
+
+Colab 등 해외 서버에서 `aihubshell`로 받으면 `AI 허브는 해외에서의 데이터 다운로드를
+제한하고 있습니다` 로 막힌다. **반드시 한국 IP(집 PC 등)에서 다운로드**한 뒤,
+학습 환경(Colab)으로 옮긴다:
+- 라벨(작음)·소량은 로컬에서 받아 이 스크립트로 바로 전처리.
+- 음성(zip당 17~28GB)은 로컬 34GB에 안 들어가면 외장하드에 받아 전처리 →
+  **작은 클립만** Google Drive 업로드 → Colab에서 학습.
+
 ## 실제 데이터로 실행
 
-1. AI Hub에서 데이터 다운로드 (계정·승인·수동)
+1. AI Hub에서 데이터 다운로드 (계정·승인·수동, **한국 IP에서**)
    - 예: [한국어 방언 발화(경상도)](https://www.aihub.or.kr/aihubdata/data/view.do?dataSetSn=119),
      [전라도](https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=120),
      [충청도](https://www.aihub.or.kr/aihubdata/data/view.do?dataSetSn=122)
