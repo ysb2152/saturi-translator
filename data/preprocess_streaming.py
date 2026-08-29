@@ -15,10 +15,13 @@ temp WAV 삭제, 를 반복한다. 피크 디스크 = (zip 크기) + (temp WAV 1
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import shutil
+import tarfile
 import tempfile
 import zipfile
+from bisect import bisect_right
 from hashlib import md5
 from pathlib import Path
 
@@ -26,6 +29,67 @@ from aihub_schema import extract_utterance, get_utterance_list
 from wav_utils import slice_wav
 
 AUDIO_SUFFIXES = (".wav", ".WAV")
+
+
+class _ConcatParts(io.RawIOBase):
+    """AI Hub가 tar 안에 `xxx.zip.part<offset>` 로 1GB씩 쪼개 담은 zip을,
+    재구성(디스크 복사) 없이 하나의 seekable 스트림처럼 제공한다. 실제 바이트는
+    tar 파일에서 직접 읽어, zipfile이 그대로 멤버를 추출할 수 있게 한다."""
+
+    def __init__(self, tar_path: str):
+        self._f = open(tar_path, "rb")
+        parts = []  # (zip_offset, tar_data_offset, size)
+        with tarfile.open(tar_path) as t:
+            for m in t.getmembers():
+                if ".zip.part" in m.name:
+                    off = int(m.name.rsplit(".part", 1)[1])
+                    parts.append((off, m.offset_data, m.size))
+        parts.sort()
+        self._starts = [p[0] for p in parts]
+        self._parts = parts
+        self._size = parts[-1][0] + parts[-1][2] if parts else 0
+        self._pos = 0
+
+    def seekable(self):
+        return True
+
+    def seek(self, pos, whence=0):
+        self._pos = pos if whence == 0 else (self._pos + pos if whence == 1 else self._size + pos)
+        return self._pos
+
+    def tell(self):
+        return self._pos
+
+    def read(self, n=-1):
+        if n is None or n < 0:
+            n = self._size - self._pos
+        out = bytearray()
+        while n > 0 and self._pos < self._size:
+            i = bisect_right(self._starts, self._pos) - 1
+            zoff, toff, size = self._parts[i]
+            within = self._pos - zoff
+            take = min(n, size - within)
+            self._f.seek(toff + within)
+            chunk = self._f.read(take)
+            if not chunk:
+                break
+            out += chunk
+            self._pos += len(chunk)
+            n -= len(chunk)
+        return bytes(out)
+
+    def readinto(self, b):
+        data = self.read(len(b))
+        b[:len(data)] = data
+        return len(data)
+
+
+def open_audio_zip(path: str) -> zipfile.ZipFile:
+    """일반 zip 이면 그대로, tar(내부 .zip.partN)면 가상 스트림으로 연다."""
+    if tarfile.is_tarfile(path):
+        print("tar(분할 zip) 감지 → 가상 스트림으로 처리(재구성 없이)")
+        return zipfile.ZipFile(_ConcatParts(path))
+    return zipfile.ZipFile(path)
 
 
 def build_label_index(labels_root: Path) -> dict[str, Path]:
@@ -70,7 +134,7 @@ def main():
              "skipped_dur": 0, "skipped_slice": 0}
     tmp_wav = clip_dir / "_stream_tmp.wav"
 
-    with zipfile.ZipFile(args.zip) as zf:
+    with open_audio_zip(args.zip) as zf:
         members = [m for m in zf.namelist() if m.endswith(AUDIO_SUFFIXES)]
         print(f"zip 내 WAV {len(members)}개 — 스트리밍 처리 시작")
         for mi, member in enumerate(members):
