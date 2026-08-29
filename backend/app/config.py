@@ -21,7 +21,12 @@ WHISPER_COMPUTE_TYPE = os.getenv(
 LANGUAGE = os.getenv("LANGUAGE", "ko")
 
 # 2단계 변환 모델(KoBART) 디렉터리. 있으면 규칙 스텁 대신 이 모델로 추론.
-CONVERTER_MODEL_DIR = os.getenv("CONVERTER_MODEL_DIR", "").strip()
+# 환경변수 CONVERTER_MODEL_DIR 우선, 없으면 backend/models/kobart-dialect 가 있으면 자동 사용.
+_DEFAULT_CONVERTER = Path(__file__).resolve().parent.parent / "models" / "kobart-dialect"
+CONVERTER_MODEL_DIR = (
+    os.getenv("CONVERTER_MODEL_DIR", "").strip()
+    or (str(_DEFAULT_CONVERTER) if _DEFAULT_CONVERTER.exists() else "")
+)
 CONVERTER_DEVICE = os.getenv("CONVERTER_DEVICE", "cpu")  # cpu / cuda
 
 # 업로드 임시 파일 저장 위치
