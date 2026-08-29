@@ -17,14 +17,16 @@ import random
 from pathlib import Path
 
 
-def load(path: Path):
-    if not path.exists():
-        return
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                yield json.loads(line)
+def load(paths):
+    """여러 폴더의 {split}.jsonl 을 모두 순회(다지역 통합)."""
+    for path in paths:
+        if not path.exists():
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
 
 
 def build(records, identity_ratio: float, min_len: int, max_len: int,
@@ -64,7 +66,8 @@ def build(records, identity_ratio: float, min_len: int, max_len: int,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in-dir", default="data/processed/mt")
+    ap.add_argument("--in-dir", nargs="+", default=["data/processed/mt"],
+                    help="변환쌍 폴더(들). 여러 지역을 합치려면 공백으로 나열")
     ap.add_argument("--out-dir", default="data/processed/mt_balanced")
     ap.add_argument("--identity-ratio", type=float, default=0.3,
                     help="최종 세트에서 동일쌍(방언=표준) 목표 비율")
@@ -75,11 +78,13 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    in_dir, out_dir = Path(args.in_dir), Path(args.out_dir)
+    in_dirs = [Path(d) for d in args.in_dir]
+    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    print("입력 폴더:", ", ".join(str(d) for d in in_dirs))
 
     for split, cap in (("train", args.max_train), ("val", args.max_val)):
-        recs = load(in_dir / f"{split}.jsonl")
+        recs = load([d / f"{split}.jsonl" for d in in_dirs])
         out, n_diff, n_ident = build(recs, args.identity_ratio,
                                      args.min_len, args.max_len, args.seed, cap)
         with open(out_dir / f"{split}.jsonl", "w", encoding="utf-8") as f:

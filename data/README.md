@@ -60,6 +60,30 @@ AI Hub 방언 데이터는 연도/지역별로 필드명이 다르다. 이 전�
 - 전사 마커(`(A)/(B)` 이중전사, `{웃음}`, `(())`, 어절 뒤 `b/`·`l/` 등)는
   [`clean_text`](aihub_schema.py)가 정제. 방언/표준 각각 다른 쪽을 선택.
 
+## 다지역(전국 사투리) 확장
+
+파이프라인은 지역 무관이라, 다른 지역 데이터를 같은 방식으로 처리해 **합쳐서 학습**하면
+한 모델이 여러 사투리를 커버한다. 변환(KoBART)은 라벨(작음)만 있으면 되므로 특히 쉽다.
+
+지역별 dataSetSn: 경상도 119 · 전라도 120 · 강원도 121 · 충청도 122 · 제주도 123
+(제주는 어휘 차이가 커 난이도 높음 → 마지막 확장 권장)
+
+```bash
+# 1) 지역별 라벨을 각각 받아 전처리 (한국 IP에서 다운로드)
+python data/preprocess.py --raw data/raw_label_gyeongsang --out data/processed_gs
+python data/preprocess.py --raw data/raw_label_jeolla    --out data/processed_jl
+python data/preprocess.py --raw data/raw_label_chungcheong --out data/processed_cc
+
+# 2) 여러 지역 변환쌍을 합쳐 균형 학습셋 구성(중복 자동 제거)
+python data/build_mt_dataset.py \
+    --in-dir data/processed_gs/mt data/processed_jl/mt data/processed_cc/mt \
+    --out-dir data/processed/mt_balanced
+
+# 3) 이 통합 세트로 KoBART 재학습 → 다지역 변환 모델
+```
+
+STT(음성)는 지역마다 17~28GB라, 먼저 한 지역으로 증명하고 나머지는 소량씩 추가하는 편이 현실적.
+
 ## 대용량 음성(STT): 스트리밍 전처리 — 외장하드 없이
 
 원천(음성) zip은 하나가 17~28GB라 압축을 다 풀면 로컬 34GB에 안 들어간다.
