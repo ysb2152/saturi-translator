@@ -25,6 +25,20 @@ training\.venv\Scripts\python.exe training\train_kobart.py `
   생성이 정상 종료된다(무한 반복 방지). 스크립트에 반영돼 있음.
 - 생성은 반복 억제(`no_repeat_ngram_size`, `repetition_penalty`, `early_stopping`) 적용.
 
-## 다음: Whisper STT 학습(예정)
-음성 클립(`data/preprocess_streaming.py` 산출물)이 준비되면 같은 환경에서 Whisper 파인튜닝
-스크립트를 추가한다. GPU가 로컬에 있으니 Colab 불필요.
+## Whisper STT 학습
+
+표준 Whisper를 사투리 음성으로 파인튜닝해 인식률을 개선한다. 입력은
+`data/preprocess_streaming.py`(또는 `preprocess.py`)가 만든 STT 매니페스트
+(`data/processed/stt/{train,val}.jsonl`).
+
+```powershell
+training\.venv\Scripts\python.exe training\train_whisper.py `
+    --data data\processed\stt --model openai/whisper-base --epochs 2
+```
+- 학습 후 val **CER** 출력(표준 Whisper 대비 비교용). 저장: `backend/models/whisper-dialect`
+- 모델 크기: `openai/whisper-base`(빠름) / `openai/whisper-small`(정확, 느림)
+- 빠른 실험: `--max-train 3000 --epochs 1`
+- 오디오 로딩은 `soundfile`+`librosa`로 직접 처리(datasets Audio의 torchcodec 의존 회피).
+
+> ⚠️ 데이터 주의: 음성 파일명 stem이 라벨 stem과 **일치해야** 매칭된다. AI Hub 경상도의
+> add-on 음성(경상도_8)은 학습데이터_1 라벨과 겹치지 않으니, 라벨과 짝인 음성을 써야 함.

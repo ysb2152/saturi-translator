@@ -28,8 +28,10 @@ backend/models/
 # 로컬 GPU 학습 환경/산출물
 training/.venv/
 training/runs/
+training/runs_whisper/
 training/*_out/
 training/*_runs/
+training/_smoke*/
 
 # 데이터 전처리 산출물(생성물 — 스크립트로 재생성)
 data/processed/
