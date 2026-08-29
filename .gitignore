@@ -25,6 +25,12 @@ tmp/
 backend/models/
 *.safetensors
 
+# 로컬 GPU 학습 환경/산출물
+training/.venv/
+training/runs/
+training/*_out/
+training/*_runs/
+
 # 데이터 전처리 산출물(생성물 — 스크립트로 재생성)
 data/processed/
 data/processed_*/
