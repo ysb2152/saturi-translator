@@ -22,7 +22,8 @@ import json
 import random
 from pathlib import Path
 
-from aihub_schema import extract_utterance, get_session_audio_name, get_utterance_list
+from aihub_schema import (extract_utterance, get_session_audio_name,
+                          get_utterance_list, parse_txt_label)
 from wav_utils import slice_wav, wav_duration
 
 AUDIO_EXTS = [".wav", ".WAV"]
@@ -75,12 +76,16 @@ def main():
     (out_root / "stt").mkdir(parents=True, exist_ok=True)
     (out_root / "mt").mkdir(parents=True, exist_ok=True)
 
-    label_files = sorted(raw_root.glob(args.labels_glob))
-    # 오디오와 이름이 겹치는 json 만 라벨로 간주하기보다, 파싱 실패 시 자연히 skip
+    json_files = sorted(raw_root.glob(args.labels_glob))
+    # JSON이 없는 세션은 .txt(이중전사)로 대체 — 지역에 따라 .txt만 제공됨
+    json_stems = {f.stem.lower() for f in json_files}
+    txt_files = [f for f in raw_root.rglob("*.txt") if f.stem.lower() not in json_stems]
+    label_files = json_files + txt_files
     if args.limit:
         label_files = label_files[: args.limit]
     if not label_files:
-        raise SystemExit(f"라벨 JSON을 찾지 못했습니다: {raw_root}/{args.labels_glob}")
+        raise SystemExit(f"라벨(.json/.txt)을 찾지 못했습니다: {raw_root}")
+    print(f"라벨: JSON {len(json_files)}개 + TXT {len(txt_files)}개")
 
     # 오디오 인덱스를 한 번만 구축(라벨만 있으면 비어 있음 → STT는 자연히 skip)
     audio_index = build_audio_index(raw_root)
@@ -101,17 +106,20 @@ def main():
     for lf in label_files:
         split = "val" if lf in val_set else "train"
         try:
-            obj = json.loads(lf.read_text(encoding="utf-8"))
+            if lf.suffix.lower() == ".json":
+                obj = json.loads(lf.read_text(encoding="utf-8"))
+                utts = [extract_utterance(u) for u in get_utterance_list(obj)]
+            else:  # .txt (이중전사)
+                obj = {}
+                utts = parse_txt_label(lf.read_text(encoding="utf-8", errors="replace"))
         except (json.JSONDecodeError, UnicodeDecodeError):
             stats["parse_errors"] += 1
             continue
 
-        utts = get_utterance_list(obj)
         session_audio = None if args.no_slice else find_session_audio(lf, obj, audio_index)
 
-        for i, raw_utt in enumerate(utts):
+        for i, u in enumerate(utts):
             stats["utterances"] += 1
-            u = extract_utterance(raw_utt)
             if u is None:
                 stats["skipped_empty"] += 1
                 continue

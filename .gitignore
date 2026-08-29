@@ -27,6 +27,7 @@ backend/models/
 
 # 데이터 전처리 산출물(생성물 — 스크립트로 재생성)
 data/processed/
+data/processed_*/
 data/sample_raw/
 # AI Hub 원본 데이터(용량 큼, 저작권 — 저장소에 올리지 않음)
 data/raw/

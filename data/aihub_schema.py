@@ -153,6 +153,28 @@ def extract_utterance(utt: dict) -> Utterance | None:
                      start=start, end=end)
 
 
+def parse_txt_label(content: str) -> list["Utterance"]:
+    """.txt 형식 라벨 파싱(일부 지역은 JSON 대신 .txt 제공).
+
+    각 줄이 'speaker_id\\t전사' 형태이고, 전사에는 (방언)/(표준) 이중전사가 들어있다.
+    clean_text가 방언/표준을 각각 뽑아낸다(타임스탬프는 없어 STT엔 못 씀).
+    """
+    out: list[Utterance] = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t", 1)
+        text = parts[1] if len(parts) == 2 else parts[0]
+        dialect = clean_text(text, mode="dialect")
+        standard = clean_text(text, mode="standard")
+        if not dialect and not standard:
+            continue
+        out.append(Utterance(dialect=dialect or standard,
+                             standard=standard or dialect, start=None, end=None))
+    return out
+
+
 def get_session_audio_name(obj: dict) -> str | None:
     """메타데이터에서 세션 오디오 파일명을 찾는다(없으면 None → JSON 파일명 기준 매칭)."""
     meta = _first(obj, FIELDS["metadata_keys"])
