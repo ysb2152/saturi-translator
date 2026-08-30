@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-08-31 | feat | STT 4지역 확대 착수 — 전라도 Validation 음성(전라도_3.zip, tar 분할zip)에서 스트리밍 전처리로 **2만 클립**(train 19.7K/val 451) 생성, 라벨 매칭 100%(86/86 세션). `data/processed_jl/stt`. 원본 zip은 처리 후 삭제 | B-10 |
 | 2026-08-31 | feat | 앱 에뮬레이터 실기 테스트 — small STT 파이프라인 동작 확인. 데모(샘플) 버튼은 `__DEV__` 게이팅해 **릴리스 빌드에선 숨김**. 관찰: STT가 발음 유사어로 오인식하는 사례 있음(경상 편중 학습·small 한계 → 후속 데이터 보강/디코딩 튜닝 과제) | B-10 |
 | 2026-08-30 | result | **STT를 whisper-small로 재학습** — 표준 대비 CER **14.6%→6.7%(54% 개선)**, base(10.2%)보다 우위. effective 배치 16 고정(4×누적4)으로 base와 동일 조건→모델 효과 분리. GPU 메모리(10GB+디스플레이)·타 앱(크롬/디스코드) VRAM 경쟁으로 batch 튜닝 필요했음 | B-10 |
 | 2026-08-30 | feat | 파인튜닝 Whisper·KoBART **백엔드 서빙 연결** — 앱 파이프라인(STT→변환) 통합 확인. ct2 변환기-transformers 버전 충돌로, Whisper는 CTranslate2 대신 transformers로 직접 서빙(오디오 디코딩은 faster-whisper 유틸 재사용) | B-10 |
