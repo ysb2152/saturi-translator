@@ -57,6 +57,7 @@ def main():
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--lr", type=float, default=1e-5)
     ap.add_argument("--max-train", type=int, default=0)
+    ap.add_argument("--grad-accum", type=int, default=1, help="그래디언트 누적(유효배치=batch*accum)")
     args = ap.parse_args()
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -134,6 +135,7 @@ def main():
         output_dir=args.run_dir,
         per_device_train_batch_size=args.batch,
         per_device_eval_batch_size=args.batch,
+        gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         num_train_epochs=args.epochs,
         warmup_ratio=0.1,
