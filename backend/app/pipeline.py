@@ -22,10 +22,38 @@ class TranslationResult:
 
 
 class Transcriber:
-    """faster-whisper 래퍼. 모델은 첫 사용 시 지연 로딩."""
+    """STT 래퍼. config.WHISPER_FT_DIR 이 있으면 파인튜닝 Whisper(transformers)로,
+    없으면 faster-whisper로 인식. 모델은 첫 사용 시 지연 로딩."""
 
     def __init__(self) -> None:
         self._model = None
+        self._ft = None      # 파인튜닝 Whisper(transformers)
+        self._proc = None
+
+    def _load_ft(self):
+        if self._ft is not None:
+            return
+        import torch  # noqa: F401
+        from transformers import WhisperForConditionalGeneration, WhisperProcessor
+
+        logger.info("파인튜닝 Whisper 로딩: %s", config.WHISPER_FT_DIR)
+        self._proc = WhisperProcessor.from_pretrained(
+            config.WHISPER_FT_DIR, language="korean", task="transcribe")
+        self._ft = WhisperForConditionalGeneration.from_pretrained(
+            config.WHISPER_FT_DIR).to(config.WHISPER_DEVICE).eval()
+
+    def _transcribe_ft(self, audio_path: str) -> tuple[str, float]:
+        import torch
+        from faster_whisper.audio import decode_audio  # av 기반 디코딩 재사용
+
+        arr = decode_audio(audio_path, sampling_rate=16000)
+        dur = len(arr) / 16000.0
+        feats = self._proc(arr, sampling_rate=16000, return_tensors="pt").input_features
+        feats = feats.to(config.WHISPER_DEVICE)
+        with torch.no_grad():
+            gen = self._ft.generate(feats, max_new_tokens=128)
+        text = self._proc.batch_decode(gen, skip_special_tokens=True)[0].strip()
+        return text, float(dur)
 
     def _load(self):
         if self._model is not None:
@@ -46,6 +74,9 @@ class Transcriber:
 
     def transcribe(self, audio_path: str) -> tuple[str, float]:
         """오디오 파일 경로를 받아 (텍스트, 오디오길이초)를 반환."""
+        if config.WHISPER_FT_DIR:
+            self._load_ft()
+            return self._transcribe_ft(audio_path)
         model = self._load()
         segments, info = model.transcribe(
             audio_path,
@@ -129,7 +160,10 @@ class Pipeline:
 
     def warmup(self) -> None:
         """서버 기동 시 모델을 미리 로딩(첫 요청 지연 방지)."""
-        self.transcriber._load()
+        if config.WHISPER_FT_DIR:
+            self.transcriber._load_ft()
+        else:
+            self.transcriber._load()
 
     def run(self, audio_path: str) -> TranslationResult:
         dialect_text, duration = self.transcriber.transcribe(audio_path)

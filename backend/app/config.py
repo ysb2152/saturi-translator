@@ -9,6 +9,14 @@ WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 # 파인튜닝된 STT 모델을 CTranslate2로 변환해 둔 디렉터리 경로(있으면 WHISPER_MODEL 대신 사용).
 WHISPER_MODEL_DIR = os.getenv("WHISPER_MODEL_DIR", "").strip()
 
+# 파인튜닝된 Whisper(transformers 포맷) 디렉터리. 있으면 faster-whisper 대신 이 모델로 STT.
+# 환경변수 우선, 없으면 backend/models/whisper-dialect 자동 감지.
+_DEFAULT_WHISPER_FT = Path(__file__).resolve().parent.parent / "models" / "whisper-dialect"
+WHISPER_FT_DIR = (
+    os.getenv("WHISPER_FT_DIR", "").strip()
+    or (str(_DEFAULT_WHISPER_FT) if _DEFAULT_WHISPER_FT.exists() else "")
+)
+
 # 추론 장치: cpu / cuda
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 
