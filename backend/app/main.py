@@ -48,6 +48,28 @@ def health():
     return {"status": "ok", "model": config.WHISPER_MODEL_DIR or config.WHISPER_MODEL}
 
 
+# 녹음 없이 앱에서 파이프라인을 검증하기 위한 데모: 서버의 사투리 샘플을 무작위로 처리.
+import random
+from pathlib import Path as _Path
+_SAMPLES = _Path(__file__).resolve().parent.parent / "samples"
+
+
+@app.get("/demo")
+def demo():
+    clips = list(_SAMPLES.glob("*.wav"))
+    if not clips:
+        raise HTTPException(status_code=404, detail="샘플 클립이 없습니다.")
+    clip = random.choice(clips)
+    result = pipeline.run(str(clip))
+    return {
+        "dialect_text": result.dialect_text,
+        "standard_text": result.standard_text,
+        "language": result.language,
+        "duration": round(result.duration, 2),
+        "sample": clip.name,
+    }
+
+
 @app.post("/transcribe")
 async def transcribe(audio: UploadFile = File(...)):
     # 확장자 검증

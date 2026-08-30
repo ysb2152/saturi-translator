@@ -43,3 +43,4 @@ data/raw_label/
 data/raw_audio/
 data/raw*/
 __pycache__/
+backend/samples/

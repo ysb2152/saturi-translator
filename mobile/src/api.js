@@ -36,3 +36,19 @@ export async function transcribe(serverUrl, uri) {
 
   return JSON.parse(res.body); // { dialect_text, standard_text, language, duration }
 }
+
+// 녹음 없이 검증: 서버의 사투리 샘플을 파이프라인에 태워 결과만 받아온다.
+export async function demoTranscribe(serverUrl) {
+  const res = await fetch(`${serverUrl.replace(/\/+$/, '')}/demo`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j.detail) detail = j.detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
