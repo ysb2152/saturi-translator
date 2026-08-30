@@ -97,7 +97,7 @@ python data/preprocess_streaming.py \
     --zip "(비식별화완료)경상도_1.zip" \
     --labels data/raw_label \
     --out data/processed \
-    --max-clips 20000        # 포트폴리오용 소량만(0=무제한)
+    --max-clips 20000        # 소량만 추출(0=무제한)
 ```
 
 - `--max-clips` 로 개수를 제한하면 클립 몇 GB만 남아 **무료 Google Drive**에 올려 Colab 학습 가능.
