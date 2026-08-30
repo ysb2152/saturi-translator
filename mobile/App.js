@@ -210,13 +210,16 @@ export default function App() {
 
         <Text style={styles.status}>{status}</Text>
 
-        <Pressable
-          style={({ pressed }) => [styles.demoBtn, pressed && { opacity: 0.7 }]}
-          onPress={runDemo}
-          disabled={busy || recording}
-        >
-          <Text style={styles.demoBtnText}>🎧 녹음 없이 샘플로 테스트</Text>
-        </Pressable>
+        {/* 개발/테스트용 데모 버튼 — 릴리스(플레이스토어) 빌드에선 __DEV__=false 라 숨겨짐 */}
+        {__DEV__ && (
+          <Pressable
+            style={({ pressed }) => [styles.demoBtn, pressed && { opacity: 0.7 }]}
+            onPress={runDemo}
+            disabled={busy || recording}
+          >
+            <Text style={styles.demoBtnText}>🎧 녹음 없이 샘플로 테스트 (개발용)</Text>
+          </Pressable>
+        )}
 
         {error && (
           <View style={styles.errorBox}>
