@@ -98,10 +98,31 @@ def main():
     model.generation_config.language = "korean"
     model.generation_config.task = "transcribe"
     model.generation_config.forced_decoder_ids = None
+    model.to(dev)
+
+    import jiwer
+
+    def eval_cer(m, tag, n=300):
+        """val 일부에서 CER 측정(baseline/파인튜닝 공통)."""
+        m.eval()
+        val = ds["validation"].select(range(min(n, len(ds["validation"]))))
+        refs, preds = [], []
+        for i in range(0, len(val), args.batch):
+            feats = torch.tensor(val[i:i + args.batch]["input_features"]).to(dev)
+            with torch.no_grad():
+                g = m.generate(feats, max_new_tokens=128)
+            preds += processor.tokenizer.batch_decode(g, skip_special_tokens=True)
+            refs += processor.tokenizer.batch_decode(
+                val[i:i + args.batch]["labels"], skip_special_tokens=True)
+        c = jiwer.cer(refs, preds)
+        print(f"[{tag}] CER: {c:.4f}")
+        return c, refs, preds
+
+    print("\n=== 파인튜닝 전 baseline 측정 (표준 Whisper) ===")
+    base_cer, _, _ = eval_cer(model, "baseline")
 
     collator = DataCollatorSpeechSeq2Seq(processor)
 
-    import jiwer
     def metrics(pred):
         pred_ids, label_ids = pred.predictions, pred.label_ids
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
@@ -120,7 +141,7 @@ def main():
         predict_with_generate=True,
         generation_max_length=128,
         logging_steps=50,
-        eval_strategy="epoch",
+        eval_strategy="no",
         save_strategy="no",
         report_to="none",
     )
@@ -135,7 +156,14 @@ def main():
     trainer.save_model(str(out))
     processor.save_pretrained(str(out))
     print(f"모델 저장: {out}")
-    print("최종 평가:", trainer.evaluate())
+
+    print("\n=== 파인튜닝 후 ===")
+    ft_cer, refs, preds = eval_cer(model, "파인튜닝")
+    print(f"\n★ CER  표준 {base_cer:.4f} → 파인튜닝 {ft_cer:.4f}  "
+          f"({(base_cer - ft_cer) / base_cer * 100:.0f}% 개선)" if base_cer else "")
+    print("--- 예시 (정답 / 예측) ---")
+    for r, p in list(zip(refs, preds))[:6]:
+        print(f"정답: {r}\n예측: {p}\n")
 
 
 if __name__ == "__main__":
