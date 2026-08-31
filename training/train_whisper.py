@@ -58,6 +58,11 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-5)
     ap.add_argument("--max-train", type=int, default=0)
     ap.add_argument("--grad-accum", type=int, default=1, help="그래디언트 누적(유효배치=batch*accum)")
+    ap.add_argument("--lora", action="store_true",
+                    help="LoRA 파인튜닝(원본 표준어 능력 보존, 어댑터 작음). 저장 시 병합해 일반 모델로 서빙")
+    ap.add_argument("--lora-r", type=int, default=32)
+    ap.add_argument("--lora-alpha", type=int, default=64)
+    ap.add_argument("--lora-dropout", type=float, default=0.05)
     args = ap.parse_args()
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -122,6 +127,15 @@ def main():
     print("\n=== 파인튜닝 전 baseline 측정 (표준 Whisper) ===")
     base_cer, _, _ = eval_cer(model, "baseline")
 
+    if args.lora:
+        from peft import LoraConfig, get_peft_model
+        lcfg = LoraConfig(r=args.lora_r, lora_alpha=args.lora_alpha,
+                          target_modules=["q_proj", "v_proj"],
+                          lora_dropout=args.lora_dropout, bias="none")
+        model = get_peft_model(model, lcfg)
+        print("LoRA 적용 (원본 가중치 동결, 어댑터만 학습):")
+        model.print_trainable_parameters()
+
     collator = DataCollatorSpeechSeq2Seq(processor)
 
     def metrics(pred):
@@ -155,7 +169,14 @@ def main():
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    trainer.save_model(str(out))
+    if args.lora:
+        adir = out / "adapter_lora"
+        model.save_pretrained(str(adir))  # 어댑터만(수 MB) — 로드맵(온디바이스/지역별) 재사용
+        print(f"LoRA 어댑터 저장: {adir}")
+        model = model.merge_and_unload()  # 서빙용 병합 → 백엔드는 일반 모델로 로드(변경 불필요)
+        model.save_pretrained(str(out))
+    else:
+        trainer.save_model(str(out))
     processor.save_pretrained(str(out))
     print(f"모델 저장: {out}")
 
