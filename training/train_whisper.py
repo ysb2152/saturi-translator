@@ -63,6 +63,10 @@ def main():
     ap.add_argument("--lora-r", type=int, default=32)
     ap.add_argument("--lora-alpha", type=int, default=64)
     ap.add_argument("--lora-dropout", type=float, default=0.05)
+    ap.add_argument("--resume-adapter", default="",
+                    help="기존 LoRA 어댑터 경로. 지정하면 새로 만들지 않고 이어서 학습(나눠 학습용)")
+    ap.add_argument("--no-baseline", action="store_true",
+                    help="학습 전 CER 측정 생략(이어학습에서 시간 절약)")
     args = ap.parse_args()
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -124,17 +128,24 @@ def main():
         print(f"[{tag}] CER: {c:.4f}")
         return c, refs, preds
 
-    print("\n=== 파인튜닝 전 baseline 측정 (표준 Whisper) ===")
-    base_cer, _, _ = eval_cer(model, "baseline")
-
     if args.lora:
-        from peft import LoraConfig, get_peft_model
-        lcfg = LoraConfig(r=args.lora_r, lora_alpha=args.lora_alpha,
-                          target_modules=["q_proj", "v_proj"],
-                          lora_dropout=args.lora_dropout, bias="none")
-        model = get_peft_model(model, lcfg)
-        print("LoRA 적용 (원본 가중치 동결, 어댑터만 학습):")
+        if args.resume_adapter:
+            from peft import PeftModel
+            model = PeftModel.from_pretrained(model, args.resume_adapter, is_trainable=True)
+            print(f"기존 LoRA 어댑터 이어서 학습: {args.resume_adapter}")
+        else:
+            from peft import LoraConfig, get_peft_model
+            lcfg = LoraConfig(r=args.lora_r, lora_alpha=args.lora_alpha,
+                              target_modules=["q_proj", "v_proj"],
+                              lora_dropout=args.lora_dropout, bias="none")
+            model = get_peft_model(model, lcfg)
+        print("LoRA (원본 동결, 어댑터만 학습):")
         model.print_trainable_parameters()
+
+    base_cer = None
+    if not args.no_baseline:
+        print("\n=== 학습 전 CER 측정 ===")
+        base_cer, _, _ = eval_cer(model, "before")
 
     collator = DataCollatorSpeechSeq2Seq(processor)
 
