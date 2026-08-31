@@ -47,6 +47,54 @@ class DataCollatorSpeechSeq2Seq:
         return batch
 
 
+def _load_audio_np(path):
+    import soundfile as sf, librosa, numpy as np
+    arr, sr = sf.read(path)
+    if getattr(arr, "ndim", 1) > 1:
+        arr = arr.mean(axis=1)
+    arr = arr.astype(np.float32)
+    if sr != SR:
+        arr = librosa.resample(arr, orig_sr=sr, target_sr=SR)
+    return arr
+
+
+def _augment(arr, rng):
+    """on-the-fly 증강: 25% 전화 협대역, 70% 랜덤 SNR 소음(near-clean~강소음 스펙트럼)."""
+    import numpy as np, librosa
+    if rng.random() < 0.25:
+        arr = librosa.resample(librosa.resample(arr, orig_sr=SR, target_sr=8000),
+                               orig_sr=8000, target_sr=SR)
+    if rng.random() < 0.70:
+        snr = rng.uniform(5, 25)
+        sig = float(np.mean(arr ** 2)) + 1e-9
+        noise = rng.standard_normal(len(arr)).astype(np.float32)
+        scale = np.sqrt(sig / (10 ** (snr / 10)) / (float(np.mean(noise ** 2)) + 1e-9))
+        arr = arr + noise * scale
+    return arr.astype(np.float32)
+
+
+@dataclass
+class AugmentCollator:
+    """학습 배치마다 오디오를 로드→증강→특징추출(캐시 없음, 매 에폭 다른 소음)."""
+    processor: Any
+
+    def __post_init__(self):
+        import numpy as np
+        self._rng = np.random.default_rng()
+
+    def __call__(self, features):
+        arrs = [_augment(_load_audio_np(f["audio_filepath"]), self._rng) for f in features]
+        inp = self.processor.feature_extractor(arrs, sampling_rate=SR, return_tensors="pt")
+        batch = {"input_features": inp.input_features}
+        lab = [{"input_ids": f["labels"]} for f in features]
+        lb = self.processor.tokenizer.pad(lab, return_tensors="pt")
+        labels = lb["input_ids"].masked_fill(lb.attention_mask.ne(1), -100)
+        if (labels[:, 0] == self.processor.tokenizer.bos_token_id).all().cpu().item():
+            labels = labels[:, 1:]
+        batch["labels"] = labels
+        return batch
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/processed/stt")
@@ -67,6 +115,8 @@ def main():
                     help="기존 LoRA 어댑터 경로. 지정하면 새로 만들지 않고 이어서 학습(나눠 학습용)")
     ap.add_argument("--no-baseline", action="store_true",
                     help="학습 전 CER 측정 생략(이어학습에서 시간 절약)")
+    ap.add_argument("--augment", action="store_true",
+                    help="학습 배치에 on-the-fly 소음/코덱 증강(평가는 clean). map 캐시 없음")
     args = ap.parse_args()
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -95,14 +145,20 @@ def main():
             arr = librosa.resample(arr, orig_sr=sr, target_sr=SR)
         return arr
 
-    def prep(b):
-        arr = load_audio(b["audio_filepath"])
-        b["input_features"] = processor.feature_extractor(
-            arr, sampling_rate=SR).input_features[0]
-        b["labels"] = processor.tokenizer(b["text"]).input_ids
-        return b
-
-    ds = ds.map(prep, remove_columns=ds["train"].column_names, num_proc=1)
+    if args.augment:
+        # 증강 모드: 특징은 콜레이터가 배치마다 계산 → map은 라벨만(경로 유지, 캐시 최소)
+        def prep(b):
+            b["labels"] = processor.tokenizer(b["text"]).input_ids
+            return b
+        ds = ds.map(prep, remove_columns=["text", "duration"], num_proc=1)
+    else:
+        def prep(b):
+            arr = load_audio(b["audio_filepath"])
+            b["input_features"] = processor.feature_extractor(
+                arr, sampling_rate=SR).input_features[0]
+            b["labels"] = processor.tokenizer(b["text"]).input_ids
+            return b
+        ds = ds.map(prep, remove_columns=ds["train"].column_names, num_proc=1)
 
     model = WhisperForConditionalGeneration.from_pretrained(args.model)
     model.generation_config.language = "korean"
@@ -117,13 +173,19 @@ def main():
         m.eval()
         val = ds["validation"].select(range(min(n, len(ds["validation"]))))
         refs, preds = [], []
+        has_feat = "input_features" in val.column_names
         for i in range(0, len(val), args.batch):
-            feats = torch.tensor(val[i:i + args.batch]["input_features"]).to(dev)
+            b = val[i:i + args.batch]
+            if has_feat:
+                feats = torch.tensor(b["input_features"]).to(dev)
+            else:  # 증강 모드: 평가는 clean 오디오로 특징 계산
+                arrs = [_load_audio_np(p) for p in b["audio_filepath"]]
+                feats = processor.feature_extractor(
+                    arrs, sampling_rate=SR, return_tensors="pt").input_features.to(dev)
             with torch.no_grad():
                 g = m.generate(feats, max_new_tokens=128)
             preds += processor.tokenizer.batch_decode(g, skip_special_tokens=True)
-            refs += processor.tokenizer.batch_decode(
-                val[i:i + args.batch]["labels"], skip_special_tokens=True)
+            refs += processor.tokenizer.batch_decode(b["labels"], skip_special_tokens=True)
         c = jiwer.cer(refs, preds)
         print(f"[{tag}] CER: {c:.4f}")
         return c, refs, preds
@@ -147,7 +209,9 @@ def main():
         print("\n=== 학습 전 CER 측정 ===")
         base_cer, _, _ = eval_cer(model, "before")
 
-    collator = DataCollatorSpeechSeq2Seq(processor)
+    collator = AugmentCollator(processor) if args.augment else DataCollatorSpeechSeq2Seq(processor)
+    if args.augment:
+        print("소음/코덱 on-the-fly 증강 학습 (평가는 clean)")
 
     def metrics(pred):
         pred_ids, label_ids = pred.predictions, pred.label_ids
@@ -171,6 +235,7 @@ def main():
         eval_strategy="no",
         save_strategy="no",
         report_to="none",
+        remove_unused_columns=not args.augment,  # 증강 모드는 콜레이터가 audio_filepath 필요
     )
     trainer = Seq2SeqTrainer(model=model, args=targs,
                              train_dataset=ds["train"], eval_dataset=ds["validation"],
