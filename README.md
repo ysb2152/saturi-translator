@@ -15,7 +15,7 @@
        (사투리 음성 인식)                    (사투리→표준어 재작성)
 ```
 
-- **① STT** — Whisper. 표준 Whisper를 사투리 음성으로 파인튜닝해 인식률 개선(whisper-small **CER 14.6%→6.7%**). 서빙은 파인튜닝 모델을 transformers로 직접.
+- **① STT** — Whisper. 표준 Whisper를 4지역 방언 음성으로 **LoRA 파인튜닝**(경상·전라·충청·강원). held-out 전체 val에서 **CER 20.3%→11.7%**(상세 [EVALUATION.md](EVALUATION.md)). 서빙은 파인튜닝 모델을 transformers로 직접.
 - **② 변환** — `KoBART` seq2seq를 사투리→표준어 문장쌍으로 파인튜닝(진행 중).
 - 앱은 얇게: 녹음 → 서버(FastAPI) 전송 → 결과 표시.
 
@@ -33,7 +33,7 @@ AI Hub 경상도 방언 라벨을 전처리해 **208만 문장쌍**을 확보했
 - **경상도 단일**: CER 4.62% → 1.01%, 정확일치 29.6% → 82.2%
 - **4지역(경상·전라·충청·강원)**: CER 5.79% → 1.63%, 정확일치 26.5% → 77.7%
 
-그리고 **STT(Whisper)** 도 표준 대비 사투리 인식 CER을 **14.6% → 6.7%(54% 개선, whisper-small)** 로 낮췄다. 즉 음성 인식·표준어 변환 **두 단계 모두** "표준 모델이 못하는 것을 데이터로 개선"을 정량 증명했다.
+그리고 **STT(Whisper)** 도 4지역 방언 음성 LoRA 파인튜닝으로 표준 대비 사투리 인식 CER을 **20.3% → 11.7%(4지역 가중평균, held-out 전체 val)** 로 낮췄다(상세 [EVALUATION.md](EVALUATION.md)). 즉 음성 인식·표준어 변환 **두 단계 모두** "표준 모델이 못하는 것을 데이터로 개선"을 정량 증명했다.
 
 전체 분석은 [data/analysis.md](data/analysis.md), 파인튜닝 설계·근거는 [why_finetune.md](why_finetune.md) 참고.
 
@@ -85,7 +85,7 @@ python data/build_mt_dataset.py       # 변환 학습셋(균형)
 - [x] 앱 뼈대 + "한지×클린" 디자인, 녹음→변환 왕복 확인
 - [x] AI Hub 전처리 + 208만 문장쌍 + 데이터 분석
 - [x] KoBART 변환 모델 파인튜닝 — 경상 단일 **CER 4.6%→1.0%**, 4지역 통합 **CER 5.8%→1.6%** (copy 대비) + 백엔드 연동
-- [x] Whisper STT 파인튜닝 — 표준 대비 **CER 14.6%→6.7%**(54% 개선, whisper-small), 로컬 GPU 학습
+- [x] Whisper STT 4지역 LoRA 파인튜닝 — 표준 대비 **CER 20.3%→11.7%**(4지역 가중평균, held-out 전체 val), 상세 [EVALUATION.md](EVALUATION.md)
 - [ ] 플레이스토어 배포
 
 진행 상세는 [DEVELOPMENT_JOURNEY.md](DEVELOPMENT_JOURNEY.md).
