@@ -100,14 +100,30 @@ def _real_noise(n, rng):
     return None
 
 
+def _reverb(arr, rng):
+    """합성 잔향(exponential-decay RIR convolution). 실측 RIR 없이 잔향 강건성 부여."""
+    import numpy as np
+    rt60 = rng.uniform(0.1, 0.6)
+    n = max(8, int(rt60 * SR))
+    t = np.arange(n)
+    ir = rng.standard_normal(n).astype(np.float32) * np.exp(-6.9 * t / n)
+    ir[0] = 1.0
+    peak = float(np.max(np.abs(arr))) + 1e-9
+    out = np.convolve(arr, ir)[:len(arr)]
+    out *= peak / (float(np.max(np.abs(out))) + 1e-9)
+    return out.astype(np.float32)
+
+
 def _augment(arr, rng):
-    """on-the-fly 증강: 전화 협대역 + 랜덤 SNR 소음(MUSAN 실제소음 우선, 없으면 가우시안)."""
+    """on-the-fly 증강: 잔향 + 전화 협대역 + harder SNR 소음(MUSAN 실제소음 우선)."""
     import numpy as np, librosa
+    if rng.random() < 0.30:
+        arr = _reverb(arr, rng)
     if rng.random() < 0.25:
         arr = librosa.resample(librosa.resample(arr, orig_sr=SR, target_sr=8000),
                                orig_sr=8000, target_sr=SR)
-    if rng.random() < 0.75:
-        snr = rng.uniform(0, 20)
+    if rng.random() < 0.80:
+        snr = rng.uniform(-5, 20)  # harder: 신호보다 소음이 큰 경우까지
         sig = float(np.mean(arr ** 2)) + 1e-9
         noise = _real_noise(len(arr), rng)
         if noise is None:
@@ -115,6 +131,23 @@ def _augment(arr, rng):
         scale = np.sqrt(sig / (10 ** (snr / 10)) / (float(np.mean(noise ** 2)) + 1e-9))
         arr = arr + noise * scale
     return arr.astype(np.float32)
+
+
+def _spec_augment(feats, rng):
+    """SpecAugment: mel 특징에 시간/주파수 마스킹(배치 텐서 in-place)."""
+    b, M, T = feats.shape
+    for i in range(b):
+        for _ in range(2):
+            f = int(rng.integers(0, 16))
+            if f > 0:
+                f0 = int(rng.integers(0, max(1, M - f)))
+                feats[i, f0:f0 + f, :] = 0.0
+        for _ in range(2):
+            tt = int(rng.integers(0, 70))
+            if tt > 0:
+                t0 = int(rng.integers(0, max(1, T - tt)))
+                feats[i, :, t0:t0 + tt] = 0.0
+    return feats
 
 
 @dataclass
@@ -129,7 +162,8 @@ class AugmentCollator:
     def __call__(self, features):
         arrs = [_augment(_load_audio_np(f["audio_filepath"]), self._rng) for f in features]
         inp = self.processor.feature_extractor(arrs, sampling_rate=SR, return_tensors="pt")
-        batch = {"input_features": inp.input_features}
+        feats = _spec_augment(inp.input_features, self._rng)  # SpecAugment(시간/주파수 마스킹)
+        batch = {"input_features": feats}
         lab = [{"input_ids": f["labels"]} for f in features]
         lb = self.processor.tokenizer.pad(lab, return_tensors="pt")
         labels = lb["input_ids"].masked_fill(lb.attention_mask.ne(1), -100)
