@@ -87,15 +87,16 @@
 
 ## 온디바이스 양자화 실현가능성
 
-on-device 배포 시 양자화가 정확도를 해치는지 검증(torch 동적 int8, whisper.cpp GGUF의 보수적 프록시). 재현: [`training/quant_eval.py`](training/quant_eval.py).
+on-device 배포 시 양자화가 정확도를 해치는지 검증(torch 동적 int8, whisper.cpp GGUF의 보수적 프록시). 재현: [`training/quant_eval.py`](training/quant_eval.py), [`training/quant_eval_kobart.py`](training/quant_eval_kobart.py).
 
-| | fp32 | int8 | 변화 |
-|---|---:|---:|---:|
-| STT CER(4지역 가중, n=80/지역) | 10.17% | 10.42% | +0.25%p |
-| STT 모델 크기 | ~967MB | ~242MB | ÷4 |
+| 모델 | fp32 CER | int8 CER | 손실 | 크기(fp32→int8) |
+|---|---:|---:|---:|---:|
+| STT (Whisper, n=80/지역) | 10.17% | 10.42% | +0.25%p | 967 → ~242MB |
+| 변환 (KoBART, n=150/지역) | 0.92% | 0.93% | +0.00%p | 495 → ~124MB |
+| **합계** | | | **무시 가능** | **~366MB** |
 
-- **int8 양자화로 정확도 손실 ~0.25%p(무시 가능)** — 실물 배포용 whisper.cpp q5는 보통 이보다 우수(~190MB).
-- KoBART 포함 온디바이스 모델 총 **~370MB**(STT 242 + 변환기 125), 첫 실행 다운로드 시 설치 ~50MB.
+- **두 모델 모두 int8 양자화 후 정확도가 사실상 유지**(STT +0.25%p, KoBART +0.00%p). 실물 배포용 whisper.cpp q5는 보통 이보다 우수(~190MB).
+- 온디바이스 모델 총 **~366MB**, 첫 실행 다운로드 방식이면 설치 ~50MB.
 - 결론: **양자화 후에도 정확도가 유지돼 온디바이스 배포가 현실적**. (네이티브 통합은 별도 작업 — whisper.cpp/onnxruntime + 커스텀 EAS 빌드.)
 
 ## 한계 / 유의점
