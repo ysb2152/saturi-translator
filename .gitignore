@@ -44,3 +44,6 @@ data/raw_audio/
 data/raw*/
 __pycache__/
 backend/samples/
+
+# 루트 AGENTS.md는 로컬 전용(깃헙 미포함), mobile/AGENTS.md는 추적
+/AGENTS.md
