@@ -58,16 +58,60 @@ def _load_audio_np(path):
     return arr
 
 
+_NOISE_FILES = None
+
+
+def _noise_files():
+    """MUSAN 실제 소음 wav 목록(환경변수 MUSAN_NOISE_DIR, 기본 data/noise/musan/noise)."""
+    global _NOISE_FILES
+    if _NOISE_FILES is None:
+        import os, glob
+        d = os.getenv("MUSAN_NOISE_DIR", "data/noise/musan/noise")
+        _NOISE_FILES = glob.glob(os.path.join(d, "**", "*.wav"), recursive=True)
+        if _NOISE_FILES:
+            print(f"[augment] MUSAN 실제 소음 {len(_NOISE_FILES)}개 사용")
+        else:
+            print("[augment] MUSAN 없음 → 가우시안 소음 폴백")
+    return _NOISE_FILES
+
+
+def _real_noise(n, rng):
+    """MUSAN에서 랜덤 소음 조각을 길이 n 으로 반환(없으면 None → 가우시안 폴백)."""
+    import numpy as np, soundfile as sf, librosa
+    files = _noise_files()
+    if not files:
+        return None
+    for _ in range(3):
+        try:
+            a, sr = sf.read(files[rng.integers(len(files))])
+            if getattr(a, "ndim", 1) > 1:
+                a = a.mean(axis=1)
+            a = a.astype(np.float32)
+            if sr != SR:
+                a = librosa.resample(a, orig_sr=sr, target_sr=SR)
+            if len(a) == 0:
+                continue
+            if len(a) < n:
+                a = np.tile(a, int(np.ceil(n / len(a))))
+            st = int(rng.integers(0, len(a) - n + 1)) if len(a) > n else 0
+            return a[st:st + n]
+        except Exception:
+            continue
+    return None
+
+
 def _augment(arr, rng):
-    """on-the-fly 증강: 25% 전화 협대역, 70% 랜덤 SNR 소음(near-clean~강소음 스펙트럼)."""
+    """on-the-fly 증강: 전화 협대역 + 랜덤 SNR 소음(MUSAN 실제소음 우선, 없으면 가우시안)."""
     import numpy as np, librosa
     if rng.random() < 0.25:
         arr = librosa.resample(librosa.resample(arr, orig_sr=SR, target_sr=8000),
                                orig_sr=8000, target_sr=SR)
-    if rng.random() < 0.70:
-        snr = rng.uniform(5, 25)
+    if rng.random() < 0.75:
+        snr = rng.uniform(0, 20)
         sig = float(np.mean(arr ** 2)) + 1e-9
-        noise = rng.standard_normal(len(arr)).astype(np.float32)
+        noise = _real_noise(len(arr), rng)
+        if noise is None:
+            noise = rng.standard_normal(len(arr)).astype(np.float32)
         scale = np.sqrt(sig / (10 ** (snr / 10)) / (float(np.mean(noise ** 2)) + 1e-9))
         arr = arr + noise * scale
     return arr.astype(np.float32)

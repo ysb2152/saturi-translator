@@ -47,3 +47,7 @@ backend/samples/
 
 # 루트 AGENTS.md는 로컬 전용(깃헙 미포함), mobile/AGENTS.md는 추적
 /AGENTS.md
+
+# 소음 데이터(다운로드 산출물, 학습 전용)
+data/musan.tar.gz
+data/noise/
