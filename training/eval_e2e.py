@@ -45,7 +45,8 @@ def build_std_lookup(region_dir):
 def stt_batch(model, proc, arrs, dev):
     feats = proc.feature_extractor(arrs, sampling_rate=SR, return_tensors="pt").input_features.to(dev)
     with torch.no_grad():
-        g = model.generate(feats, max_new_tokens=128, no_repeat_ngram_size=3)
+        # 서빙과 동일하게 beam search(5)
+        g = model.generate(feats, max_new_tokens=128, num_beams=5, no_repeat_ngram_size=3)
     return proc.tokenizer.batch_decode(g, skip_special_tokens=True)
 
 
