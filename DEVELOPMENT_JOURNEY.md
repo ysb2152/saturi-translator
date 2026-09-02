@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-03 | result | **whisper.rn 네이티브 빌드 통과** — whisper.rn 0.7.4 설치 + prebuild + `assembleDebug` **BUILD SUCCESSFUL**(467 태스크). whisper.cpp C/C++가 RN0.86/New Arch에서 컴파일, APK에 librnwhisper.so(arm64/armeabi+CPU변형) 포함. STT 네이티브 모듈 호환 리스크 해소, 다음은 JS 연결+온디바이스 인식 | B-15 |
 | 2026-09-03 | result | **버전 호환 스파이크 통과** — 폴더 영문 이전(`뭐라는겨`→`saturi-translator`) 후 prebuild 재생성 + `gradlew assembleDebug` **BUILD SUCCESSFUL**(427 태스크, app-debug.apk 171.8MB). RN0.86/React19/New Arch 네이티브 빌드 정상 확인. 리포·아티팩트·venv 온전 | B-15 |
 | 2026-09-03 | result | **버전 호환 스파이크 — 한글 경로가 빌드 블로커** — expo-dev-client + prebuild(newArchEnabled=true 확인) 후 gradle 빌드가 한글 경로 인코딩으로 실패(plugin 해결 불가). ASCII 경로 복사 시 `BUILD SUCCESSFUL`. SDK57/RN0.86/New Arch 자체는 정상 → 로컬 폴더 영문 이전으로 해결 | B-15 |
 | 2026-09-02 | result | **STT(Whisper) GGUF 변환 검증** — 앱 없이 dev PC에서 파인튜닝 병합모델을 whisper.cpp `convert-h5-to-ggml.py`로 변환. `ggml-model-f16.bin` 487MB, ggml 매직 유효. 우리 모델이 whisper.cpp 포맷으로 깨끗이 변환됨 확인. q5 양자화는 C 빌드(컴파일러) 필요로 보류 | B-15 |

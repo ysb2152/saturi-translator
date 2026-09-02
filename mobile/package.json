@@ -9,7 +9,8 @@
     "expo-file-system": "~57.0.6",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "whisper.rn": "^0.7.4"
   },
   "scripts": {
     "start": "expo start",
