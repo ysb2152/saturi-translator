@@ -19,7 +19,7 @@ import {
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
 
-import { DEFAULT_SERVER_URL, transcribe, demoTranscribe } from './src/api';
+import { DEFAULT_SERVER_URL, transcribe } from './src/api';
 
 // ── 한지 × 클린 하이브리드 팔레트 ──
 const HANJI = '#F5EDDD';      // 한지빛 배경
@@ -120,25 +120,6 @@ export default function App() {
     else startRecording();
   };
 
-  // 녹음 없이 서버 샘플로 파이프라인 검증
-  const runDemo = async () => {
-    if (busy || recording) return;
-    setError(null);
-    setResult(null);
-    setBusy(true);
-    setStatus('샘플 사투리로 테스트 중…');
-    try {
-      const data = await demoTranscribe(serverUrl);
-      setResult(data);
-      setStatus('샘플 결과예요. 직접 녹음도 해보세요!');
-    } catch (e) {
-      setError(`샘플 테스트 실패: ${e.message}`);
-      setStatus('문제가 생겼어요. 서버 연결을 확인해 주세요.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const ringStyle = {
     transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2] }) }],
     opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] }),
@@ -156,7 +137,7 @@ export default function App() {
         {/* ── 정체성(한지) ── */}
         <View style={styles.badge}>
           <View style={styles.badgeDot} />
-          <Text style={styles.badgeText}>전국 사투리</Text>
+          <Text style={styles.badgeText}>충청·강원·전라·경상</Text>
         </View>
         <Text style={styles.title}>사투리 번역</Text>
         <Text style={styles.subtitle}>사투리로 말하면{'\n'}표준어로 바꿔드려요</Text>
@@ -209,17 +190,6 @@ export default function App() {
         </View>
 
         <Text style={styles.status}>{status}</Text>
-
-        {/* 개발/테스트용 데모 버튼 — 릴리스(플레이스토어) 빌드에선 __DEV__=false 라 숨겨짐 */}
-        {__DEV__ && (
-          <Pressable
-            style={({ pressed }) => [styles.demoBtn, pressed && { opacity: 0.7 }]}
-            onPress={runDemo}
-            disabled={busy || recording}
-          >
-            <Text style={styles.demoBtnText}>🎧 녹음 없이 샘플로 테스트 (개발용)</Text>
-          </Pressable>
-        )}
 
         {error && (
           <View style={styles.errorBox}>
@@ -346,14 +316,6 @@ const styles = StyleSheet.create({
   status: {
     marginTop: 30, fontSize: 16, color: INK, textAlign: 'center', fontWeight: '500',
   },
-
-  demoBtn: {
-    marginTop: 16, alignSelf: 'center',
-    backgroundColor: '#FFFFFFCC', borderRadius: 999,
-    paddingHorizontal: 18, paddingVertical: 10,
-    borderWidth: 1, borderColor: TEAL_LINE,
-  },
-  demoBtnText: { fontSize: 14, color: TEAL_INK, fontWeight: '600' },
 
   errorBox: {
     marginTop: 16, width: '100%',
