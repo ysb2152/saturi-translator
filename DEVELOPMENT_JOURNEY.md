@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-02 | result | **STT(Whisper) GGUF 변환 검증** — 앱 없이 dev PC에서 파인튜닝 병합모델을 whisper.cpp `convert-h5-to-ggml.py`로 변환. `ggml-model-f16.bin` 487MB, ggml 매직 유효. 우리 모델이 whisper.cpp 포맷으로 깨끗이 변환됨 확인. q5 양자화는 C 빌드(컴파일러) 필요로 보류 | B-15 |
 | 2026-09-02 | result | **변환기(KoBART) ONNX int8 검증** — 앱 없이 dev PC에서 최대 리스크 선(先)검증. optimum ONNX export(encoder/decoder/with-past) + onnxruntime int8. 변환기 **268MB**, PyTorch 대비 생성 **정합성 5/5 완전 일치**. 리스크가 "모델 export"→"앱 JS 토크나이저/생성루프"로 좁혀짐. `backend/onnx_quant_parity.py` | B-15 |
 | 2026-09-02 | feat | **배포 준비(공통 선행)** — eas.json 빌드 프로파일, app.json 릴리스 식별자(com.ysb2152.saturitranslator·versionCode), 앱 내 AI허브 출처 표기, 개인정보처리방침 초안(백엔드 즉시삭제 동작 확인 후 문구 일치). 온디바이스 vs 서버는 다음 단계 결정 | B-15 |
 | 2026-09-02 | decision | **충청 재보강 기각** — 재학습 전 충청 val 오류 유형 분석(beam=5, n=300). 치환 97% 1회성(산발적)·반복 오류는 표기 규약(것/거, 띄어쓰기)뿐 → 데이터 증량 표적 없음, 남은 실질오류는 whisper-small 한계. 배포로 전환 | B-11 |

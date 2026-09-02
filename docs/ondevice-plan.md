@@ -15,7 +15,9 @@
 
 ## 2. STT — whisper.rn + GGUF
 
-1. 파인튜닝 병합 모델(`backend/models/whisper-dialect`)을 **GGUF로 변환** — whisper.cpp의 `convert-h5-to-ggml.py`(HF transformers 형식 입력)로 ggml 변환 후 `quantize`로 q5_0(≈190MB) 또는 q8_0.
+> ✅ **ggml 변환은 이미 검증 완료**(2026-09-02, 앱 없이 dev PC). 파인튜닝 병합 모델(`backend/models/whisper-dialect`)을 whisper.cpp `convert-h5-to-ggml.py`로 변환 → **`ggml-model-f16.bin` 487MB**, ggml 매직(`0x6c6d6767`) 유효 확인. 우리 모델이 whisper.cpp 포맷으로 깨끗이 변환됨. 재현: 모델의 `vocab.json`·`added_tokens.json`·`config.json` + openai/whisper의 `whisper/assets/mel_filters.npz`만 있으면 됨 → `python convert-h5-to-ggml.py <model_dir> <whisper_assets_dir> <out_dir>`. **q5 양자화는 미완**(whisper.cpp `quantize` 바이너리 = C 빌드 필요, 이 PC에 cmake/컴파일러 없음). q5 목표 ~190MB는 EVALUATION에 기산정됨.
+
+1. 파인튜닝 병합 모델(`backend/models/whisper-dialect`)을 **GGUF로 변환** ✅ (f16 완료) — 후속 `quantize`로 q5_0(≈190MB) 또는 q8_0.
 2. 앱에서 `initWhisper({ filePath })`로 로드, 녹음 파일 경로를 `transcribe`에 전달. 언어=한국어 고정.
 3. 디코딩은 서빙과 맞추되(현재 beam=5) 온디바이스 지연을 보며 beam 축소(3 등) 절충 — EVALUATION에 이미 기록한 지연 트레이드오프.
 4. 토크나이저는 whisper.rn(whisper.cpp)이 내부 처리하므로 별도 작업 없음.
