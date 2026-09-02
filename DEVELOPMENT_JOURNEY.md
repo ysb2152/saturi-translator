@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-03 | result | **버전 호환 스파이크 — 한글 경로가 빌드 블로커** — expo-dev-client + prebuild(newArchEnabled=true 확인) 후 gradle 빌드가 한글 경로 인코딩으로 실패(plugin 해결 불가). ASCII 경로 복사 시 `BUILD SUCCESSFUL`. SDK57/RN0.86/New Arch 자체는 정상 → 로컬 폴더 영문 이전으로 해결 | B-15 |
 | 2026-09-02 | result | **STT(Whisper) GGUF 변환 검증** — 앱 없이 dev PC에서 파인튜닝 병합모델을 whisper.cpp `convert-h5-to-ggml.py`로 변환. `ggml-model-f16.bin` 487MB, ggml 매직 유효. 우리 모델이 whisper.cpp 포맷으로 깨끗이 변환됨 확인. q5 양자화는 C 빌드(컴파일러) 필요로 보류 | B-15 |
 | 2026-09-02 | result | **변환기(KoBART) ONNX int8 검증** — 앱 없이 dev PC에서 최대 리스크 선(先)검증. optimum ONNX export(encoder/decoder/with-past) + onnxruntime int8. 변환기 **268MB**, PyTorch 대비 생성 **정합성 5/5 완전 일치**. 리스크가 "모델 export"→"앱 JS 토크나이저/생성루프"로 좁혀짐. `backend/onnx_quant_parity.py` | B-15 |
 | 2026-09-02 | feat | **배포 준비(공통 선행)** — eas.json 빌드 프로파일, app.json 릴리스 식별자(com.ysb2152.saturitranslator·versionCode), 앱 내 AI허브 출처 표기, 개인정보처리방침 초안(백엔드 즉시삭제 동작 확인 후 문구 일치). 온디바이스 vs 서버는 다음 단계 결정 | B-15 |
@@ -236,6 +237,8 @@ STT용 음성(28GB)이 용량·지오블록으로 막혀 있는 동안, **음성
 구체적으로 (1) `eas.json`에 dev/preview/production 빌드 프로파일을 만들고(production은 Play Store용 app-bundle + versionCode 자동 증가), (2) `app.json`에 릴리스 식별자(`android.package`·`versionCode`, iOS `bundleIdentifier` = `com.ysb2152.saturitranslator`)를 넣었다. (3) 라이선스상 필수인 **AI 허브 출처 표기**를 앱 화면 하단에 고지로 넣었다(B-13의 이용정책 준수를 코드로 반영). (4) **개인정보처리방침 초안**([docs/privacy-policy.md](docs/privacy-policy.md))을 작성했는데, 문구를 실제 동작과 일치시키는 걸 원칙으로 삼아 백엔드를 확인했다 — 업로드 음성을 임시파일로 처리한 뒤 `finally`에서 즉시 삭제하고 DB에 남기지 않으므로, "음성을 저장하지 않고 처리 직후 삭제"로 정확히 기술했다. 앱의 데모(샘플) 버튼은 이전에 이미 `__DEV__` 게이팅해 릴리스 빌드에선 노출되지 않는다.
 
 남은 큰 결정은 **온디바이스 vs 서버**다. 온디바이스(whisper.cpp/onnxruntime + 커스텀 EAS 네이티브 빌드)는 서버 비용이 없고 오프라인·프라이버시에 유리하지만 네이티브 통합 공수가 크다 — 다만 B-12에서 **양자화해도 정확도가 유지되고 총 ~370MB로 담긴다**는 실현가능성은 이미 확인해 뒀다. 서버 방식(호스팅 백엔드)은 공수가 작고 빠르게 실제 링크를 얻지만 상시 과금 또는 상시 가동 PC가 필요하다(WTGMate에서 Cloudflare Tunnel로 다뤄 본 트레이드오프와 같은 성격). 이 선택은 다음 단계에서 확정한다. 공통 준비를 먼저 끝낸 덕에, 어느 쪽을 고르든 설정·고지·방침을 다시 만들 필요는 없다.
+
+**버전 호환 스파이크 — 한글 경로가 진짜 블로커였다.** 온디바이스 통합의 1순위 리스크로 "RN 0.86 + React 19 + New Architecture라는 최신 조합에서 네이티브 빌드가 되는가"를 꼽았고(계획서 §7-1), 무거운 네이티브 모듈을 붙이기 전에 **빈 dev client 빌드**부터 검증했다. `expo-dev-client` 설치 → `expo prebuild`(android 생성, `newArchEnabled=true` 확인 — SDK 57 기본값) → `gradlew assembleDebug`. 그런데 빌드가 19초 만에 `Error resolving plugin [com.facebook.react.settings] … Included build … does not exist`로 실패했고, 에러 로그의 경로가 깨져 나왔다(`뭐라?���?`). gradle-plugin은 실제로 존재했으므로 원인은 누락이 아니라 **한글 프로젝트 경로(`C:\Users\ysb21\뭐라는겨`)의 인코딩**이었다. junction으로 ASCII 경로를 만들어도 gradle이 실제 경로(한글)로 되돌려 해석해 동일 실패 — 즉 링크로는 못 피하고 실제 파일이 ASCII 경로에 있어야 했다. 프로젝트를 ASCII 경로로 복사해 다시 돌리니 `BUILD SUCCESSFUL`. **결론: SDK 57/RN 0.86/New Architecture 자체는 문제없고, 한글 폴더명만이 유일한 안드로이드 빌드 블로커였다.** 조치는 로컬 프로젝트 폴더를 영문 경로로 이전하는 것(깃헙 원격 저장소 이름·소스는 무관, venv는 `python.exe` 직접 호출 기준 동작 유지). 리스크가 큰 최신-버전 호환은 오히려 깨끗했고, 실제 함정은 경로 인코딩이라는 사소하지만 치명적인 곳에 있었다.
 
 ---
 
