@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-03 | result | **온디바이스 STT 실기 검증 성공** — 에뮬레이터에서 우리 f16 모델 로드+인식. 결과 "이날치라고 그 국악이 가미된 밴드"(정답 대비 조사 1글자 차) — 서버와 동일 수준. 34s(에뮬 x86_64 CPU+f16, 실기기+q5면 빨라짐). buffer 폴리필·앱 내부경로·adb reverse 등 함정 해결 | B-15 |
 | 2026-09-03 | result | **whisper.rn 네이티브 빌드 통과** — whisper.rn 0.7.4 설치 + prebuild + `assembleDebug` **BUILD SUCCESSFUL**(467 태스크). whisper.cpp C/C++가 RN0.86/New Arch에서 컴파일, APK에 librnwhisper.so(arm64/armeabi+CPU변형) 포함. STT 네이티브 모듈 호환 리스크 해소, 다음은 JS 연결+온디바이스 인식 | B-15 |
 | 2026-09-03 | result | **버전 호환 스파이크 통과** — 폴더 영문 이전(`뭐라는겨`→`saturi-translator`) 후 prebuild 재생성 + `gradlew assembleDebug` **BUILD SUCCESSFUL**(427 태스크, app-debug.apk 171.8MB). RN0.86/React19/New Arch 네이티브 빌드 정상 확인. 리포·아티팩트·venv 온전 | B-15 |
 | 2026-09-03 | result | **버전 호환 스파이크 — 한글 경로가 빌드 블로커** — expo-dev-client + prebuild(newArchEnabled=true 확인) 후 gradle 빌드가 한글 경로 인코딩으로 실패(plugin 해결 불가). ASCII 경로 복사 시 `BUILD SUCCESSFUL`. SDK57/RN0.86/New Arch 자체는 정상 → 로컬 폴더 영문 이전으로 해결 | B-15 |
@@ -243,6 +244,8 @@ STT용 음성(28GB)이 용량·지오블록으로 막혀 있는 동안, **음성
 **버전 호환 스파이크 — 한글 경로가 진짜 블로커였다.** 온디바이스 통합의 1순위 리스크로 "RN 0.86 + React 19 + New Architecture라는 최신 조합에서 네이티브 빌드가 되는가"를 꼽았고(계획서 §7-1), 무거운 네이티브 모듈을 붙이기 전에 **빈 dev client 빌드**부터 검증했다. `expo-dev-client` 설치 → `expo prebuild`(android 생성, `newArchEnabled=true` 확인 — SDK 57 기본값) → `gradlew assembleDebug`. 그런데 빌드가 19초 만에 `Error resolving plugin [com.facebook.react.settings] … Included build … does not exist`로 실패했고, 에러 로그의 경로가 깨져 나왔다(`뭐라?���?`). gradle-plugin은 실제로 존재했으므로 원인은 누락이 아니라 **한글 프로젝트 경로(`C:\Users\ysb21\뭐라는겨`)의 인코딩**이었다. junction으로 ASCII 경로를 만들어도 gradle이 실제 경로(한글)로 되돌려 해석해 동일 실패 — 즉 링크로는 못 피하고 실제 파일이 ASCII 경로에 있어야 했다. 프로젝트를 ASCII 경로로 복사해 다시 돌리니 `BUILD SUCCESSFUL`. **결론: SDK 57/RN 0.86/New Architecture 자체는 문제없고, 한글 폴더명만이 유일한 안드로이드 빌드 블로커였다.** 조치는 로컬 프로젝트 폴더를 영문 경로로 이전하는 것(깃헙 원격 저장소 이름·소스는 무관, venv는 `python.exe` 직접 호출 기준 동작 유지). 리스크가 큰 최신-버전 호환은 오히려 깨끗했고, 실제 함정은 경로 인코딩이라는 사소하지만 치명적인 곳에 있었다.
 
 조치 후 확인: 폴더를 `뭐라는겨`→`saturi-translator`(영문)로 이전하고, 리포·모델 아티팩트·venv가 온전한지 점검(git 원격 동기화 유지, venv는 `python.exe` 직접 호출로 정상 동작)한 뒤, `expo prebuild --clean`으로 android를 새 경로에 재생성하고 `gradlew assembleDebug`를 돌리니 **`BUILD SUCCESSFUL`(427 태스크, `app-debug.apk` 171.8MB)**. 네이티브 C/C++ 컴파일(react-android 0.86.3, expo-modules-core)까지 포함해 통과했다. 이로써 온디바이스 통합의 1순위 리스크(최신 버전 조합의 네이티브 빌드)가 해소됐고, 다음은 이 dev client에 whisper.rn을 붙이는 것이다.
+
+**whisper.rn 통합과 온디바이스 STT 실기 검증.** whisper.rn 0.7.4를 설치해 리빌드하니 네이티브 whisper.cpp가 RN0.86에서 그대로 컴파일됐고(APK에 x86_64 포함이라 에뮬레이터에서도 동작), STT 래퍼([`mobile/src/ondeviceStt.js`](mobile/src/ondeviceStt.js))를 붙였다. 실기 검증에서 몇 가지 함정을 순서대로 풀었다: (1) Metro 번들이 whisper.rn→safe-buffer→`buffer`(Node 내장) 미해결로 실패 → `buffer` 패키지 설치로 폴리필. (2) initWhisper가 "Failed to load the model" → adb로 앱 외부저장소에 push한 파일을 앱 uid가 못 읽는 권한 문제였고, `adb root` 후 앱 **내부** files 디렉터리에 넣고 소유권을 앱 uid로 바꿔 해결. (3) 그 `adb root`가 adbd를 재시작하며 `adb reverse tcp:8081` 포워딩을 지워 dev client가 metro에 접속 불가 → reverse 재설정. 결과, 우리 f16 모델이 에뮬레이터에서 샘플 음성을 **"이날치라고 그 국악이 가미된 밴드"** 로 인식했고, 정답과 조사 한 글자(에→이)만 달랐다 — 서버와 동일한 정확도다. 소요 34초는 에뮬 x86_64 CPU + f16 탓으로, 실기기(arm)와 q5 양자화에서 크게 줄 것이다. 온디바이스 STT가 빌드·로드·인식까지 기기에서 end-to-end로 증명됐다.
 
 ---
 

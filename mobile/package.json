@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
+    "buffer": "^6.0.3",
     "expo": "~57.0.17",
     "expo-audio": "~57.0.4",
     "expo-dev-client": "~57.0.18",
