@@ -247,6 +247,10 @@ export default function App() {
             )}
           </View>
         )}
+
+        <Text style={styles.attribution}>
+          데이터 출처: AI 허브(aihub.or.kr) 한국어 방언 음성 데이터로 학습한 모델을 사용합니다.
+        </Text>
       </ScrollView>
     </View>
   );
@@ -254,6 +258,11 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: HANJI },
+
+  attribution: {
+    marginTop: 32, fontSize: 11.5, color: SUB, opacity: 0.75,
+    textAlign: 'center', lineHeight: 17,
+  },
 
   warmBlob: {
     position: 'absolute', top: -110, right: -80,
