@@ -145,6 +145,20 @@ on-device 배포 시 양자화가 정확도를 해치는지 검증(torch 동적 
 - 온디바이스 모델 총 **~366MB**, 첫 실행 다운로드 방식이면 설치 ~50MB.
 - 결론: **양자화 후에도 정확도가 유지돼 온디바이스 배포가 현실적**. (네이티브 통합은 별도 작업 — whisper.cpp/onnxruntime + 커스텀 EAS 빌드.)
 
+### 변환기 ONNX int8 — 실제 배포 포맷 검증
+
+위 torch 동적 int8은 프록시이므로, 실제 온디바이스 경로인 **ONNX**로도 변환기(KoBART)를 검증했다(2026-09-02, 앱 없이 dev PC). `optimum-cli export onnx --task text2text-generation-with-past`로 encoder/decoder/with-past 분해 export → onnxruntime 동적 int8. 재현: [`backend/onnx_quant_parity.py`](backend/onnx_quant_parity.py).
+
+| 구성요소 | int8 크기 |
+|---|---:|
+| encoder | 67MB |
+| decoder | 104MB |
+| decoder(with-past) | 97MB |
+| **변환기 합계** | **268MB** |
+
+- **PyTorch 대비 생성 정합성 5/5 완전 일치**(서빙 디코딩 파라미터 `num_beams=4, no_repeat_ngram_size=3, repetition_penalty=1.3` 동일, 사투리 5문장 → 표준어 출력 문자열 동일). torch 프록시의 무손실 결론을 실제 배포 포맷에서 재확인.
+- 주의: merged 디코더는 If-노드 서브그래프라 동적 양자화가 적용되지 않아, **비-merged(decoder + with-past)를 양자화해 사용**한다. tokenizer.json이 export에 포함돼 온디바이스 토크나이저로 재사용 가능.
+
 ## 한계 / 유의점
 - 본 검증셋은 AI Hub 방언 데이터의 비교적 **정제된 대화·낭독 음성**이다. 실제 앱 환경(휴대폰 마이크, 배경소음, 자유발화)에서는 CER이 더 높아질 수 있어, 위 수치는 **낙관적 상한**에 가깝다.
 - 지역별 val 크기가 달라(전라 451 ~ 경상 1,811) 지역 간 직접 비교 시 표본 편차를 감안해야 한다.
