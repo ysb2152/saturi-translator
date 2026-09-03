@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-04 | result | **변환기 온디바이스 동작 성공** — 에뮬에서 "밥 문나 아직 안 무따"→"밥 문나 아직 안 먹었다"(사투리→표준어), **8.5초**. 빈 출력 버그 = decoder 출력 dataPtr이 ArrayBuffer라 argmax 실패 → Float32Array 래핑으로 수정(+int32 재export). Python .pte 재현으로 모델 정확성 먼저 확인 후 JS 진단으로 특정 | B-15 |
 | 2026-09-04 | result | **변환기 온디바이스 JS 통합 — 기기에서 로드·실행 확인** — TokenizerModule+ExecutorchModule×2(enc/dec .pte)+greedy 루프가 에뮬에서 로드·실행됨. 남은 문제: 출력 빈 문자열(생성 로직 디버깅), 문장당 ~273s(portable+KV캐시 없음+에뮬 → int8/XNNPACK/KV캐시/실기기 최적화 필요). 리소스페처 exports 패치 함정 기록 | B-15 |
 | 2026-09-04 | result | **KoBART → ExecuTorch .pte 변환 성공** — encoder(265.5MB)+decoder(322.5MB, 단일스텝) torch.export→to_executorch. 별도 venv(C:/et), portable(flatc 없이). 변환기 온디바이스 = 런타임 빌드+모델변환 양축 증명. 다음: JS useExecutorchModule 생성루프+토크나이저, int8/XNNPACK 최적화 | B-15 |
 | 2026-09-04 | result | **executorch 빌드 통과 — 변환기 런타임 확보** — react-native-executorch 0.9.3 설치+빌드 BUILD SUCCESSFUL(RN0.86), APK에 libexecutorch.so(arm64+x86_64)+whisper.rn 공존(264MB). onnxruntime 대신 executorch로 KoBART 온디바이스 경로 열림. 다음: KoBART→.pte export + JS 생성루프 | B-15 |

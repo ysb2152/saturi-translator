@@ -3,10 +3,10 @@
 // encoder 1회 → decoder 자기회귀(단일스텝, KV캐시 없음) greedy 루프.
 
 import { ExecutorchModule, TokenizerModule, initExecutorch } from 'react-native-executorch';
-// NOTE: react-native-executorch-expo-resource-fetcher 0.9.1의 package.json "exports"가
-// default/require 조건이 없어(그리고 exports 캡슐화로 내부 상대 import 차단) metro가 resolve 실패한다.
-// 해결: patch-package로 그 패키지의 "exports" 필드를 제거(또는 default 조건 추가). 그 뒤 아래 import가 동작.
-import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher';
+// NOTE: react-native-executorch-expo-resource-fetcher 0.9.1은 metro가 node_modules에서
+// 내부 파일(lib/ResourceFetcher.js)을 resolve하지 못한다(package.json exports 캡슐화 + Windows metro 크롤 이슈).
+// 회피: 어댑터 컴파일본(lib/*.js)을 src/etfetcher로 vendoring해 import한다.
+import { ExpoResourceFetcher } from './etfetcher';
 
 let _initialized = false;
 
@@ -53,7 +53,13 @@ export async function convertOnDevice(dialectText, { maxNew = 64 } = {}) {
   for (let step = 0; step < maxNew; step++) {
     const [logits] = await dec.forward([intTensor(out), encHidden, maskT]);
     const vocab = logits.sizes[logits.sizes.length - 1];
-    const buf = logits.dataPtr; // Float32Array, [1, out.length, vocab]
+    // 출력 dataPtr은 ArrayBuffer일 수 있어 Float32Array로 감싼다
+    let buf = logits.dataPtr;
+    if (!(buf instanceof Float32Array)) {
+      buf = ArrayBuffer.isView(buf)
+        ? new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4)
+        : new Float32Array(buf);
+    }
     const base = (out.length - 1) * vocab;
     let best = 0;
     let bestVal = -Infinity;
