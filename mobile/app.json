@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "사투리 번역",
+    "name": "알아 묵나?",
     "slug": "saturi-translator",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,7 +14,7 @@
       "package": "com.ysb2152.saturitranslator",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#CBB078",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -30,7 +30,14 @@
           "microphonePermission": "사투리 음성을 녹음하려면 마이크 접근 권한이 필요합니다."
         }
       ],
-      "expo-splash-screen"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#F5EDDD",
+          "imageWidth": 200
+        }
+      ]
     ]
   }
 }
