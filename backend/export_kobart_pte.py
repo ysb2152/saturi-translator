@@ -28,7 +28,8 @@ class Encoder(torch.nn.Module):
         self.enc = m.get_encoder()
 
     def forward(self, input_ids, attention_mask):
-        return self.enc(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+        # int32 입력을 받아 내부에서 long으로(JS에서 Int32Array 사용 → BigInt64Array 회피)
+        return self.enc(input_ids=input_ids.long(), attention_mask=attention_mask.long()).last_hidden_state
 
 
 def save_pte(prog, path):
@@ -49,9 +50,9 @@ class Decoder(torch.nn.Module):
 
     def forward(self, decoder_input_ids, encoder_hidden_states, encoder_attention_mask):
         out = self.model(
-            decoder_input_ids=decoder_input_ids,
+            decoder_input_ids=decoder_input_ids.long(),
             encoder_outputs=(encoder_hidden_states,),
-            attention_mask=encoder_attention_mask,
+            attention_mask=encoder_attention_mask.long(),
         )
         return out.logits
 
@@ -64,27 +65,29 @@ def lower(ep):
 
 STATIC = torch.export.Dim.STATIC
 ex = tok("밥 문나 아직 안 무따", return_tensors="pt", return_token_type_ids=False)
+ii = ex["input_ids"].int()        # int32 (JS Int32Array)
+am = ex["attention_mask"].int()   # int32
 
 # ── encoder ──
 enc = Encoder(model).eval()
 eseq = Dim("eseq", min=2, max=512)
 print("[encoder] export ...")
 with torch.no_grad():
-    ep = export(enc, (ex["input_ids"], ex["attention_mask"]),
+    ep = export(enc, (ii, am),
                 dynamic_shapes=({0: STATIC, 1: eseq}, {0: STATIC, 1: eseq}))
 mb = save_pte(lower(ep), os.path.join(OUT, "encoder.pte"))
 print(f"✅ encoder.pte {mb:.1f} MB")
 
 # ── decoder (단일 스텝) ──
 with torch.no_grad():
-    enc_hidden = enc(ex["input_ids"], ex["attention_mask"])
-dec_ids = torch.tensor([[model.config.decoder_start_token_id, 100]], dtype=torch.long)
+    enc_hidden = enc(ii, am)
+dec_ids = torch.tensor([[model.config.decoder_start_token_id, 100]], dtype=torch.int32)
 dec = Decoder(model).eval()
 eseq2 = Dim("eseq2", min=2, max=512)
 dseq = Dim("dseq", min=1, max=64)
 print("[decoder] export ...")
 with torch.no_grad():
-    dp = export(dec, (dec_ids, enc_hidden, ex["attention_mask"]),
+    dp = export(dec, (dec_ids, enc_hidden, am),
                 dynamic_shapes=({0: STATIC, 1: dseq}, {0: STATIC, 1: eseq2, 2: STATIC}, {0: STATIC, 1: eseq2}))
 mb = save_pte(lower(dp), os.path.join(OUT, "decoder.pte"))
 print(f"✅ decoder.pte {mb:.1f} MB")

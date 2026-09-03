@@ -10,7 +10,7 @@ import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetch
 
 let _initialized = false;
 
-const LONG = 4;   // ScalarType.LONG (int64)
+const INT = 3;   // ScalarType.INT (int32) — .pte를 int32 입력으로 export(BigInt64Array 회피)
 const DEC_START = 1; // KoBART decoder_start_token_id
 const EOS = 1;       // KoBART eos_token_id
 
@@ -32,12 +32,12 @@ export async function loadConverter({ tokenizerSource, encoderSource, decoderSou
   await dec.load(decoderSource);
 }
 
-// number[] → int64 텐서(TensorPtr)
-function longTensor(arr) {
+// number[] → int32 텐서(TensorPtr)
+function intTensor(arr) {
   return {
-    dataPtr: BigInt64Array.from(arr, (x) => BigInt(x)),
+    dataPtr: Int32Array.from(arr),
     sizes: [1, arr.length],
-    scalarType: LONG,
+    scalarType: INT,
   };
 }
 
@@ -46,12 +46,12 @@ export async function convertOnDevice(dialectText, { maxNew = 64 } = {}) {
   const t0 = Date.now();
   const ids = await tok.encode(dialectText);
   const mask = ids.map(() => 1);
-  const [encHidden] = await enc.forward([longTensor(ids), longTensor(mask)]);
-  const maskT = longTensor(mask);
+  const [encHidden] = await enc.forward([intTensor(ids), intTensor(mask)]);
+  const maskT = intTensor(mask);
 
   const out = [DEC_START];
   for (let step = 0; step < maxNew; step++) {
-    const [logits] = await dec.forward([longTensor(out), encHidden, maskT]);
+    const [logits] = await dec.forward([intTensor(out), encHidden, maskT]);
     const vocab = logits.sizes[logits.sizes.length - 1];
     const buf = logits.dataPtr; // Float32Array, [1, out.length, vocab]
     const base = (out.length - 1) * vocab;

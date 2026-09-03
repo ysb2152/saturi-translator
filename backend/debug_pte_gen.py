@@ -29,7 +29,8 @@ rt = Runtime.get()
 enc_m = rt.load_program(f"{PTE}/encoder.pte").load_method("forward")
 dec_m = rt.load_program(f"{PTE}/decoder.pte").load_method("forward")
 
-enc_hidden = enc_m.execute([ids, mask])[0]
+ids32, mask32 = ids.int(), mask.int()  # int32 입력(재-export 반영)
+enc_hidden = enc_m.execute([ids32, mask32])[0]
 print("\nenc_hidden:", tuple(enc_hidden.shape), enc_hidden.dtype, "mean", float(enc_hidden.float().mean()))
 
 # PyTorch encoder 비교(정합성)
@@ -40,8 +41,8 @@ print("pt_hidden vs pte max diff:", float((pt_hidden - enc_hidden).abs().max()))
 DEC_START, EOS = pt.config.decoder_start_token_id, pt.config.eos_token_id
 dec = [DEC_START]
 for step in range(20):
-    dt = torch.tensor([dec], dtype=torch.long)
-    logits = dec_m.execute([dt, enc_hidden, mask])[0]  # [1, len, vocab]
+    dt = torch.tensor([dec], dtype=torch.int32)
+    logits = dec_m.execute([dt, enc_hidden, mask32])[0]  # [1, len, vocab]
     last = logits[0, -1]
     nxt = int(last.argmax())
     top5 = torch.topk(last, 5)
