@@ -12,14 +12,22 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
-  useAudioRecorder,
-  useAudioRecorderState,
-  RecordingPresets,
   setAudioModeAsync,
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
+import { useAudioRecorder as usePcmRecorder } from '@siteed/expo-audio-studio';
+import { documentDirectory } from 'expo-file-system/legacy';
 
-import { DEFAULT_SERVER_URL, transcribe } from './src/api';
+import { DEFAULT_SERVER_URL } from './src/api';
+import { loadPipeline, runPipeline } from './src/ondevicePipeline';
+
+// 온디바이스 모델 경로(앱 파일 디렉터리; 첫 실행 다운로드 후 여기에 위치 예정)
+const MODELS = {
+  sttModel: `${documentDirectory}ggml-model-f16.bin`,
+  encoder: `${documentDirectory}encoder.pte`,
+  decoder: `${documentDirectory}decoder.pte`,
+  tokenizer: `${documentDirectory}tokenizer.json`,
+};
 
 // ── 한지 × 클린 하이브리드 팔레트 ──
 const HANJI = '#F5EDDD';      // 한지빛 배경
@@ -35,8 +43,7 @@ const CLAY_SOFT = '#F3DED3';
 const LINE = '#EBE0CC';       // 크림 위 헤어라인
 
 export default function App() {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
+  const pcm = usePcmRecorder();
 
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -45,8 +52,9 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [modelsReady, setModelsReady] = useState(false);
 
-  const recording = recorderState.isRecording;
+  const recording = pcm.isRecording;
 
   // 녹음 중 펄스 링
   const pulse = useRef(new Animated.Value(0)).current;
@@ -72,11 +80,19 @@ export default function App() {
     (async () => {
       const { granted } = await requestRecordingPermissionsAsync();
       setPermissionGranted(granted);
-      if (granted) {
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        setStatus('버튼을 누르고 사투리로 말해보세요');
-      } else {
+      if (!granted) {
         setStatus('마이크 권한이 필요해요. 설정에서 허용해 주세요.');
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      setStatus('온디바이스 모델을 준비하고 있어요…');
+      try {
+        await loadPipeline(MODELS);
+        setModelsReady(true);
+        setStatus('버튼을 누르고 사투리로 말해보세요');
+      } catch (e) {
+        setError(`온디바이스 모델 로드 실패: ${String((e && e.message) || e)}`);
+        setStatus('모델 파일이 준비되지 않았어요.');
       }
     })();
   }, []);
@@ -85,8 +101,8 @@ export default function App() {
     setError(null);
     setResult(null);
     try {
-      await recorder.prepareToRecordAsync();
-      recorder.record();
+      // 16kHz mono 16-bit PCM WAV (whisper.rn 입력 요건)
+      await pcm.startRecording({ sampleRate: 16000, channels: 1, encoding: 'pcm_16bit' });
       setStatus('듣고 있어요… 편하게 말해요');
     } catch (e) {
       setError(`녹음을 시작하지 못했어요: ${e.message}`);
@@ -95,20 +111,24 @@ export default function App() {
 
   const stopAndSend = async () => {
     try {
-      await recorder.stop();
-      const uri = recorder.uri;
+      const rec = await pcm.stopRecording();
+      const uri = rec && rec.fileUri;
       if (!uri) {
         setError('녹음 파일을 찾지 못했어요.');
         return;
       }
+      if (!modelsReady) {
+        setError('온디바이스 모델이 아직 준비되지 않았어요.');
+        return;
+      }
       setBusy(true);
-      setStatus('표준어로 옮기는 중이에요…');
-      const data = await transcribe(serverUrl, uri);
-      setResult(data);
+      setStatus('기기에서 표준어로 옮기는 중이에요…');
+      const { dialect, standard, ms } = await runPipeline(uri);
+      setResult({ dialect_text: dialect, standard_text: standard, duration: ms / 1000, language: '온디바이스' });
       setStatus('다 됐어요. 또 해볼까요?');
     } catch (e) {
       setError(`변환에 실패했어요: ${e.message}`);
-      setStatus('문제가 생겼어요. 서버 연결을 확인해 주세요.');
+      setStatus('문제가 생겼어요.');
     } finally {
       setBusy(false);
     }
