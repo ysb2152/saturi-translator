@@ -44,6 +44,12 @@ KoBART는 encoder-decoder(BART) seq2seq라 STT보다 손이 많이 간다.
 2. **토크나이저 온디바이스**: KoBART 토크나이저(SentencePiece/BPE 계열)를 JS/네이티브에서 재현해야 한다 — 가장 불확실한 부분. 후보: SentencePiece 모델을 번들해 JS 포트로 인코딩/디코딩, 또는 어휘·머지 규칙을 JS로 이식.
 3. **생성 루프**: onnxruntime-react-native로 encoder 1회 → decoder 자기회귀(greedy 또는 beam) 루프를 **JS에서 구현**(현 서빙: `max_new_tokens=64, num_beams=4, no_repeat_ngram_size=3, repetition_penalty=1.3`). EOS 처리 주의(과거 KoBART EOS 미부착 버그 이력, B-9).
 
+## 3-1. 앱 통합 (녹음 흐름 → 온디바이스)
+
+파이프라인 로직은 [`mobile/src/ondevicePipeline.js`](../mobile/src/ondevicePipeline.js)로 통합: `loadPipeline()`(STT+변환기 로드) + `runPipeline(audioPath) → {dialect, standard}`. App.js의 서버 `transcribe` 호출을 이걸로 교체하면 완전 오프라인.
+
+⚠️ **관문 — 오디오 포맷**: whisper.rn은 **16kHz mono 16-bit PCM WAV만** 받고 AAC/m4a는 디코딩하지 않는다. 그런데 **expo-audio의 Android 출력은 3gp/mpeg4/aac/webm뿐**(WAV/PCM 없음)이라 현재 녹음을 그대로 넣을 수 없다. 해결: **16kHz PCM 캡처 네이티브 모듈**(예: `@fugood/react-native-audio-pcm-stream` 또는 Expo-네이티브 `@siteed/expo-audio-studio`)로 원시 PCM을 받아 whisper.rn `transcribeData()`(raw 16-bit PCM mono 16kHz 허용)에 전달. 이 모듈은 새 네이티브 의존성이라 빌드 게이트(whisper.rn/executorch처럼) + 실기기 마이크 테스트 필요.
+
 ## 4. 모델 전달
 
 - 합계 ~370MB는 APK/AAB에 담기 부적절(Play 기본 용량 제한). **첫 실행 시 다운로드** 방식(설치 ~50MB) — EVALUATION에 이미 명시한 계획.
