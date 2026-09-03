@@ -12,6 +12,7 @@
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-executorch": "^0.9.3",
+    "react-native-executorch-expo-resource-fetcher": "^0.9.1",
     "whisper.rn": "^0.7.4"
   },
   "scripts": {
