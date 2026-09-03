@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-04 | result | **🏆 실기기 온디바이스 E2E 완주** — Galaxy S24(arm64)에서 녹음→whisper.rn STT→executorch 변환→표준어까지 **서버 없이** 동작 확인. 함정 해결: splash-screen 네이티브 크래시(설치), scoped storage(내부 dir 로드), whisper.rn WAV 파일로딩 실패(base64 data URI 우회), fileUri 이중접두. 3개 네이티브 모듈(whisper.rn·executorch·audio-studio) 공존 | B-15 |
 | 2026-09-04 | result | **변환기 최적화 — XNNPACK fp32(arm 속도) 확보** — executorch 번들 flatc로 XNNPACK export 성공, Python 검증 정확(diff 1.5e-6). int8(용량↓)은 PT2E가 정수 임베딩 입력 양자화로 실패 → 임베딩 제외 config 필요(후속). STT gguf q5도 후속 | B-15 |
 | 2026-09-04 | result | **변환기 온디바이스 동작 성공** — 에뮬에서 "밥 문나 아직 안 무따"→"밥 문나 아직 안 먹었다"(사투리→표준어), **8.5초**. 빈 출력 버그 = decoder 출력 dataPtr이 ArrayBuffer라 argmax 실패 → Float32Array 래핑으로 수정(+int32 재export). Python .pte 재현으로 모델 정확성 먼저 확인 후 JS 진단으로 특정 | B-15 |
 | 2026-09-04 | result | **변환기 온디바이스 JS 통합 — 기기에서 로드·실행 확인** — TokenizerModule+ExecutorchModule×2(enc/dec .pte)+greedy 루프가 에뮬에서 로드·실행됨. 남은 문제: 출력 빈 문자열(생성 로직 디버깅), 문장당 ~273s(portable+KV캐시 없음+에뮬 → int8/XNNPACK/KV캐시/실기기 최적화 필요). 리소스페처 exports 패치 함정 기록 | B-15 |
