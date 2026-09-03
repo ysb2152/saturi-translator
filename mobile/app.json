@@ -29,7 +29,8 @@
         {
           "microphonePermission": "사투리 음성을 녹음하려면 마이크 접근 권한이 필요합니다."
         }
-      ]
+      ],
+      "expo-splash-screen"
     ]
   }
 }
