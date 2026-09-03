@@ -2,6 +2,7 @@
 // 서버 없이 기기에서 전체 수행. 모델 파일은 앱 파일시스템 경로로 로드.
 
 import { initWhisper } from 'whisper.rn';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { loadConverter, convertOnDevice } from './ondeviceConverter';
 
 let whisperCtx = null;
@@ -29,7 +30,11 @@ export function isPipelineReady() {
 export async function runPipeline(audioPath) {
   if (!ready) throw new Error('pipeline not loaded');
   const t0 = Date.now();
-  const { promise } = whisperCtx.transcribe(audioPath, { language: 'ko', maxThreads: 4 });
+  // whisper.rn의 파일경로 WAV 로딩이 실패해, base64 data URI 경로로 전달(다른 처리 경로)
+  // fileUri가 file:/... 또는 file:///... 또는 raw 경로로 올 수 있어 정규화(이중 접두 방지)
+  const raw = audioPath.replace(/^file:\/+/, '/');       // → /data/.../xxx.wav
+  const b64 = await readAsStringAsync(`file://${raw}`, { encoding: 'base64' });
+  const { promise } = whisperCtx.transcribe(`data:audio/wav;base64,${b64}`, { language: 'ko', maxThreads: 4 });
   const stt = await promise;
   const dialect = (stt && stt.result ? stt.result : '').trim();
   const { text: standard } = await convertOnDevice(dialect);
