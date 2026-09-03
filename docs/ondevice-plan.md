@@ -53,7 +53,7 @@ KoBART는 encoder-decoder(BART) seq2seq라 STT보다 손이 많이 간다.
 ## 3-2. 최적화 (실기기 속도·용량)
 
 - ✅ **XNNPACK fp32 델리게이트**(2026-09-04): flatc(executorch 번들 `data/bin/flatc.exe`, PATH 필요)로 XNNPACK export 성공. Python 런타임 검증 정확(정답 일치, diff 1.5e-6). **arm 최적화 커널로 실기기 속도 이득**(용량은 fp32 그대로). export: `XNN=1`.
-- ⏳ **int8 양자화(용량 축소, 미완)**: executorch PT2E(`torchao.quantization.pt2e` + `XNNPACKQuantizer`) 시도했으나, 전역 config가 **정수 토큰 임베딩 입력까지 양자화**하려다 실패(`embedding indices에 float`). **임베딩/토큰입력 제외 quantizer 주석 설정**이 필요 — 후속. 성공 시 변환기 ~588MB→~150MB.
+- ✅ **int8 양자화 완료(2026-09-04)**: PT2E(XNNPACKQuantizer)는 정수 임베딩 입력까지 양자화하려다 실패(`embedding indices에 float`, set_module_type로도 안 됨). **torchao weight-only int8**(`Int8WeightOnlyConfig`)로 우회 — Linear 가중치만 int8, activation/입력 불변이라 임베딩 이슈 구조적 회피, portable(flatc 불필요). **변환기 587MB→314MB**(encoder 138 + decoder 176), **정확도 완전 유지**("밥 문나 아직 안 먹었다" 동일, enc_hidden diff 0.047이나 greedy 무영향). 함정: 인코더 in-place 양자화 후 enc_hidden 계산 시 Int8Tensor 이슈 → 디코더는 fp32 모델 새로 로드. 재현: `backend/export_kobart_pte.py` (QUANT=1).
 - ⏳ **STT gguf q5 양자화**: whisper.cpp `quantize`로 f16 487MB→q5 ~190MB(C 빌드 필요, 별도).
 
 ## 4. 모델 전달

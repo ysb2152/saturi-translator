@@ -10,8 +10,8 @@ import torch
 from torch.export import export, Dim
 from transformers import BartForConditionalGeneration, AutoTokenizer
 from executorch.exir import to_edge_transform_and_lower, to_edge
-QUANT = os.getenv("QUANT", "0") == "1"          # int8 양자화(XNNPACK 델리게이트로 실행)
-USE_XNNPACK = QUANT or os.getenv("XNN", "0") == "1"
+QUANT = os.getenv("QUANT", "0") == "1"          # int8 weight-only 양자화(torchao, portable)
+USE_XNNPACK = os.getenv("XNN", "0") == "1"
 if USE_XNNPACK:
     from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
 
@@ -65,20 +65,12 @@ def lower(ep):
 
 
 def _quantize(module, example, dynamic_shapes):
-    """PT2E int8 양자화(XNNPACKQuantizer, per-channel 대칭).
-    주의(미완): 전역 config가 정수 임베딩 입력까지 양자화하려다 실패
-    (embedding indices에 float). 임베딩/토큰입력을 제외하는 quantizer 주석 설정이 필요 — 후속 과제.
-    현재 동작 경로는 QUANT 미사용(XNNPACK fp32 또는 portable)."""
-    from executorch.backends.xnnpack.quantizer.xnnpack_quantizer import (
-        XNNPACKQuantizer, get_symmetric_quantization_config)
-    from torchao.quantization.pt2e.quantize_pt2e import prepare_pt2e, convert_pt2e
-    quantizer = XNNPACKQuantizer()
-    quantizer.set_global(get_symmetric_quantization_config(is_per_channel=True))
-    captured = export(module, example, dynamic_shapes=dynamic_shapes).module()
-    prepared = prepare_pt2e(captured, quantizer)
-    with torch.no_grad():
-        prepared(*example)  # 보정(calibration)
-    return convert_pt2e(prepared)
+    """torchao weight-only int8 — Linear 가중치만 int8(activation·입력 불변).
+    PT2E(XNNPACKQuantizer)는 정수 임베딩 입력까지 양자화하려다 실패해서, weight-only로 우회.
+    portable로 export되며 flatc/XNNPACK 불필요. 임베딩(fp32)은 유지."""
+    from torchao.quantization import quantize_, Int8WeightOnlyConfig
+    quantize_(module, Int8WeightOnlyConfig())
+    return module
 
 
 def export_and_lower(module, example, dynamic_shapes):
@@ -93,7 +85,7 @@ ex = tok("밥 문나 아직 안 무따", return_tensors="pt", return_token_type_
 ii = ex["input_ids"].int()        # int32 (JS Int32Array)
 am = ex["attention_mask"].int()   # int32
 
-print(f"모드: {'int8 양자화(XNNPACK)' if QUANT else ('XNNPACK fp32' if USE_XNNPACK else 'portable fp32')}")
+print(f"모드: {'int8 weight-only(portable)' if QUANT else ('XNNPACK fp32' if USE_XNNPACK else 'portable fp32')}")
 
 # ── encoder ──
 enc = Encoder(model).eval()
@@ -103,11 +95,12 @@ mb = save_pte(export_and_lower(enc, (ii, am),
               ({0: STATIC, 1: eseq}, {0: STATIC, 1: eseq})), os.path.join(OUT, "encoder.pte"))
 print(f"✅ encoder.pte {mb:.1f} MB")
 
-# ── decoder (단일 스텝) ──
+# ── decoder (단일 스텝) ── 인코더가 in-place 양자화됐으니 fp32 모델을 새로 로드
+model2 = BartForConditionalGeneration.from_pretrained(MODEL).eval()
 with torch.no_grad():
-    enc_hidden = enc(ii, am)
-dec_ids = torch.tensor([[model.config.decoder_start_token_id, 100]], dtype=torch.int32)
-dec = Decoder(model).eval()
+    enc_hidden = model2.get_encoder()(input_ids=ii.long(), attention_mask=am.long()).last_hidden_state
+dec_ids = torch.tensor([[model2.config.decoder_start_token_id, 100]], dtype=torch.int32)
+dec = Decoder(model2).eval()
 eseq2 = Dim("eseq2", min=2, max=512)
 dseq = Dim("dseq", min=1, max=64)
 print("[decoder] export ...")

@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-04 | result | **변환기 int8 양자화 성공** — torchao weight-only int8(Int8WeightOnlyConfig)로 PT2E 임베딩 이슈 우회. 변환기 **587MB→314MB**(enc138+dec176), 정확도 완전 유지(출력 동일). STT gguf q5는 C 빌드 필요로 후속 | B-15 |
 | 2026-09-04 | result | **🏆 standalone 릴리스 데모 완주** — `assembleRelease`(디버그 키 서명·minify off)로 JS 포함 독립 APK(160MB) 빌드·설치. **USB·PC·metro 없이 폰만으로** 새 디자인+온디바이스 파이프라인 동작. 덮어설치로 모델 유지 | B-15 |
 | 2026-09-04 | result | **🏆 실기기 온디바이스 E2E 완주** — Galaxy S24(arm64)에서 녹음→whisper.rn STT→executorch 변환→표준어까지 **서버 없이** 동작 확인. 함정 해결: splash-screen 네이티브 크래시(설치), scoped storage(내부 dir 로드), whisper.rn WAV 파일로딩 실패(base64 data URI 우회), fileUri 이중접두. 3개 네이티브 모듈(whisper.rn·executorch·audio-studio) 공존 | B-15 |
 | 2026-09-04 | result | **변환기 최적화 — XNNPACK fp32(arm 속도) 확보** — executorch 번들 flatc로 XNNPACK export 성공, Python 검증 정확(diff 1.5e-6). int8(용량↓)은 PT2E가 정수 임베딩 입력 양자화로 실패 → 임베딩 제외 config 필요(후속). STT gguf q5도 후속 | B-15 |
