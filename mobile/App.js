@@ -19,6 +19,7 @@ import { documentDirectory } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 
 import { loadPipeline, runPipeline } from './src/ondevicePipeline';
+import { ensureModels } from './src/modelDownload';
 
 // 온디바이스 모델 경로 = 앱 내부 files 디렉터리(네이티브 fopen 항상 가능; scoped storage 무관).
 // 테스트: adb push→외부→run-as로 내부 복사. 배포: 첫 실행 다운로드→documentDirectory.
@@ -55,6 +56,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [modelsReady, setModelsReady] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [downloadPct, setDownloadPct] = useState(null); // 0..1, 다운로드 중일 때만
 
   const recording = pcm.isRecording;
 
@@ -117,15 +119,20 @@ export default function App() {
         return;
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      setStatus('온디바이스 모델을 준비하고 있어요');
       setLoadingModels(true);
       try {
+        // 첫 실행: 모델(~490MB) 다운로드. 이미 있으면 즉시 통과.
+        setStatus('처음이라 모델을 내려받고 있어요');
+        const downloaded = await ensureModels((p) => setDownloadPct(p));
+        setDownloadPct(null);
+        setStatus(downloaded ? '모델을 준비하고 있어요' : '온디바이스 모델을 준비하고 있어요');
         await loadPipeline(MODELS);
         setModelsReady(true);
         setStatus('버튼을 누르고 사투리로 말해보세요');
       } catch (e) {
-        setError(`온디바이스 모델 로드 실패: ${String((e && e.message) || e)}`);
-        setStatus('모델 파일이 준비되지 않았어요');
+        setDownloadPct(null);
+        setError(`모델 준비 실패: ${String((e && e.message) || e)}`);
+        setStatus('모델을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.');
       } finally {
         setLoadingModels(false);
       }
@@ -256,7 +263,15 @@ export default function App() {
         {/* ── 정중앙 문구(마이크 ↔ 출처 사이 동일 간격) ── */}
         <View style={styles.between}>
           <Text style={[styles.status, recording && styles.statusRec]}>{status}</Text>
-          {loadingModels && (
+          {loadingModels && downloadPct != null && (
+            <>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressBar, { width: `${Math.round(downloadPct * 100)}%` }]} />
+              </View>
+              <Text style={styles.progressPct}>{Math.round(downloadPct * 100)}%</Text>
+            </>
+          )}
+          {loadingModels && downloadPct == null && (
             <View style={styles.progressTrack}><Animated.View style={[styles.progressBar, progStyle]} /></View>
           )}
           {error && (
@@ -365,6 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(46,37,27,0.10)', overflow: 'hidden',
   },
   progressBar: { height: '100%', borderRadius: 99, backgroundColor: TEAL_BRIGHT },
+  progressPct: { marginTop: 6, fontSize: 13, color: TEAL_INK, fontWeight: '700', fontVariant: ['tabular-nums'] },
 
   errorBox: {
     width: '100%', backgroundColor: CLAY_SOFT, borderRadius: 14,
