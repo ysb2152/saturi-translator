@@ -145,6 +145,22 @@ on-device 배포 시 양자화가 정확도를 해치는지 검증(torch 동적 
 - 온디바이스 모델 총 **~366MB**, 첫 실행 다운로드 방식이면 설치 ~50MB.
 - 결론: **양자화 후에도 정확도가 유지돼 온디바이스 배포가 현실적**. (네이티브 통합은 별도 작업 — whisper.cpp/onnxruntime + 커스텀 EAS 빌드.)
 
+### STT q5_0 — 실제 배포 포맷 실측 (프록시 → 실측 업그레이드, 2026-09-04)
+
+위 표의 STT int8은 torch 동적 int8 **프록시**였다. 실제 온디바이스 경로인 whisper.cpp GGUF **q5_0**를 만들어(공식 프리빌트 `whisper-quantize`, ggml-org b4938), **동일 val 파일에 f16 원본과 q5를 둘 다 실제 whisper-cli로 돌려** CER를 직접 비교했다(지역당 30, 총 120파일). 재현: [`training/q5_vs_f16.py`](training/q5_vs_f16.py) → [`backend/q5_vs_f16_result.json`](backend/q5_vs_f16_result.json).
+
+| 지역 | f16 CER | q5 CER | 델타(q5−f16) |
+|---|---:|---:|---:|
+| 경상 | 3.97% | 4.21% | +0.25%p |
+| 전라 | 5.08% | 4.67% | −0.41%p |
+| 충청 | 10.90% | 10.25% | −0.65%p |
+| 강원 | 16.53% | 16.19% | −0.34%p |
+| **전체** | **8.78%** | **8.43%** | **−0.35%p** |
+
+- **q5가 전체적으로 오히려 −0.35%p 낮음(=더 정확).** 지역별 편차 −0.65~+0.25%p는 전부 측정 노이즈 범위(지역당 30샘플) → **통계적으로 유의미한 정확도 저하 없음.** 120개 중 **85개(71%)는 f16과 예측이 글자 단위로 완전 동일.**
+- 크기: f16 **487MB → q5_0 175MB(−64%)**. "q5는 프록시보다 우수"라던 예상이 실측으로 확인됨.
+- 결론: 양자화 정당성이 **샘플 1개 스팟체크가 아니라 120파일 정량 비교**로 뒷받침됨. 온디바이스 STT는 q5_0 채택.
+
 ### 변환기 ONNX int8 — 실제 배포 포맷 검증
 
 위 torch 동적 int8은 프록시이므로, 실제 온디바이스 경로인 **ONNX**로도 변환기(KoBART)를 검증했다(2026-09-02, 앱 없이 dev PC). `optimum-cli export onnx --task text2text-generation-with-past`로 encoder/decoder/with-past 분해 export → onnxruntime 동적 int8. 재현: [`backend/onnx_quant_parity.py`](backend/onnx_quant_parity.py).
