@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-03 | result | **변환기 RN 런타임 비호환 발견** — onnxruntime-react-native 1.24.3이 SDK57/RN0.86/gradle9에서 빌드 실패(`SoftwareComponent 'release' not found`, project ':expo'). 되돌려 whisper.rn green 유지. 모델 export/양자화는 정상, RN 통합만 막힘 → 하이브리드(STT 온디바이스+변환기 서버) 권장, 계획서 §3 | B-15 |
 | 2026-09-03 | result | **온디바이스 STT 다중샘플 측정** — 기기에서 4지역 val 8개(지역당 2개) 인식. **평균 CER 5.7%**(서버 val 수준), 지연 ~31s/문장(에뮬 x86_64+f16). 정확도 손실 없이 온디바이스 동작 확인, `EVALUATION.md` | B-15 |
 | 2026-09-03 | result | **온디바이스 STT 실기 검증 성공** — 에뮬레이터에서 우리 f16 모델 로드+인식. 결과 "이날치라고 그 국악이 가미된 밴드"(정답 대비 조사 1글자 차) — 서버와 동일 수준. 34s(에뮬 x86_64 CPU+f16, 실기기+q5면 빨라짐). buffer 폴리필·앱 내부경로·adb reverse 등 함정 해결 | B-15 |
 | 2026-09-03 | result | **whisper.rn 네이티브 빌드 통과** — whisper.rn 0.7.4 설치 + prebuild + `assembleDebug` **BUILD SUCCESSFUL**(467 태스크). whisper.cpp C/C++가 RN0.86/New Arch에서 컴파일, APK에 librnwhisper.so(arm64/armeabi+CPU변형) 포함. STT 네이티브 모듈 호환 리스크 해소, 다음은 JS 연결+온디바이스 인식 | B-15 |
