@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-04 | result | **KoBART → ExecuTorch .pte 변환 성공** — encoder(265.5MB)+decoder(322.5MB, 단일스텝) torch.export→to_executorch. 별도 venv(C:/et), portable(flatc 없이). 변환기 온디바이스 = 런타임 빌드+모델변환 양축 증명. 다음: JS useExecutorchModule 생성루프+토크나이저, int8/XNNPACK 최적화 | B-15 |
 | 2026-09-04 | result | **executorch 빌드 통과 — 변환기 런타임 확보** — react-native-executorch 0.9.3 설치+빌드 BUILD SUCCESSFUL(RN0.86), APK에 libexecutorch.so(arm64+x86_64)+whisper.rn 공존(264MB). onnxruntime 대신 executorch로 KoBART 온디바이스 경로 열림. 다음: KoBART→.pte export + JS 생성루프 | B-15 |
 | 2026-09-03 | result | **변환기 RN 런타임 비호환 발견** — onnxruntime-react-native 1.24.3이 SDK57/RN0.86/gradle9에서 빌드 실패(`SoftwareComponent 'release' not found`, project ':expo'). 되돌려 whisper.rn green 유지. 모델 export/양자화는 정상, RN 통합만 막힘 → 하이브리드(STT 온디바이스+변환기 서버) 권장, 계획서 §3 | B-15 |
 | 2026-09-03 | result | **온디바이스 STT 다중샘플 측정** — 기기에서 4지역 val 8개(지역당 2개) 인식. **평균 CER 5.7%**(서버 val 수준), 지연 ~31s/문장(에뮬 x86_64+f16). 정확도 손실 없이 온디바이스 동작 확인, `EVALUATION.md` | B-15 |
