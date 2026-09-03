@@ -50,6 +50,12 @@ KoBART는 encoder-decoder(BART) seq2seq라 STT보다 손이 많이 간다.
 
 ⚠️ **관문 — 오디오 포맷**: whisper.rn은 **16kHz mono 16-bit PCM WAV만** 받고 AAC/m4a는 디코딩하지 않는다. 그런데 **expo-audio의 Android 출력은 3gp/mpeg4/aac/webm뿐**(WAV/PCM 없음)이라 현재 녹음을 그대로 넣을 수 없다. 해결: **16kHz PCM 캡처 네이티브 모듈**(예: `@fugood/react-native-audio-pcm-stream` 또는 Expo-네이티브 `@siteed/expo-audio-studio`)로 원시 PCM을 받아 whisper.rn `transcribeData()`(raw 16-bit PCM mono 16kHz 허용)에 전달. 이 모듈은 새 네이티브 의존성이라 빌드 게이트(whisper.rn/executorch처럼) + 실기기 마이크 테스트 필요.
 
+## 3-2. 최적화 (실기기 속도·용량)
+
+- ✅ **XNNPACK fp32 델리게이트**(2026-09-04): flatc(executorch 번들 `data/bin/flatc.exe`, PATH 필요)로 XNNPACK export 성공. Python 런타임 검증 정확(정답 일치, diff 1.5e-6). **arm 최적화 커널로 실기기 속도 이득**(용량은 fp32 그대로). export: `XNN=1`.
+- ⏳ **int8 양자화(용량 축소, 미완)**: executorch PT2E(`torchao.quantization.pt2e` + `XNNPACKQuantizer`) 시도했으나, 전역 config가 **정수 토큰 임베딩 입력까지 양자화**하려다 실패(`embedding indices에 float`). **임베딩/토큰입력 제외 quantizer 주석 설정**이 필요 — 후속. 성공 시 변환기 ~588MB→~150MB.
+- ⏳ **STT gguf q5 양자화**: whisper.cpp `quantize`로 f16 487MB→q5 ~190MB(C 빌드 필요, 별도).
+
 ## 4. 모델 전달
 
 - 합계 ~370MB는 APK/AAB에 담기 부적절(Play 기본 용량 제한). **첫 실행 시 다운로드** 방식(설치 ~50MB) — EVALUATION에 이미 명시한 계획.

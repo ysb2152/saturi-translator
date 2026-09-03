@@ -10,7 +10,8 @@ import torch
 from torch.export import export, Dim
 from transformers import BartForConditionalGeneration, AutoTokenizer
 from executorch.exir import to_edge_transform_and_lower, to_edge
-USE_XNNPACK = os.getenv("XNN", "0") == "1"
+QUANT = os.getenv("QUANT", "0") == "1"          # int8 양자화(XNNPACK 델리게이트로 실행)
+USE_XNNPACK = QUANT or os.getenv("XNN", "0") == "1"
 if USE_XNNPACK:
     from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
 
@@ -63,19 +64,43 @@ def lower(ep):
     return to_edge(ep).to_executorch()
 
 
+def _quantize(module, example, dynamic_shapes):
+    """PT2E int8 양자화(XNNPACKQuantizer, per-channel 대칭).
+    주의(미완): 전역 config가 정수 임베딩 입력까지 양자화하려다 실패
+    (embedding indices에 float). 임베딩/토큰입력을 제외하는 quantizer 주석 설정이 필요 — 후속 과제.
+    현재 동작 경로는 QUANT 미사용(XNNPACK fp32 또는 portable)."""
+    from executorch.backends.xnnpack.quantizer.xnnpack_quantizer import (
+        XNNPACKQuantizer, get_symmetric_quantization_config)
+    from torchao.quantization.pt2e.quantize_pt2e import prepare_pt2e, convert_pt2e
+    quantizer = XNNPACKQuantizer()
+    quantizer.set_global(get_symmetric_quantization_config(is_per_channel=True))
+    captured = export(module, example, dynamic_shapes=dynamic_shapes).module()
+    prepared = prepare_pt2e(captured, quantizer)
+    with torch.no_grad():
+        prepared(*example)  # 보정(calibration)
+    return convert_pt2e(prepared)
+
+
+def export_and_lower(module, example, dynamic_shapes):
+    m = _quantize(module, example, dynamic_shapes) if QUANT else module
+    with torch.no_grad():
+        ep = export(m, example, dynamic_shapes=dynamic_shapes)
+    return lower(ep)
+
+
 STATIC = torch.export.Dim.STATIC
 ex = tok("밥 문나 아직 안 무따", return_tensors="pt", return_token_type_ids=False)
 ii = ex["input_ids"].int()        # int32 (JS Int32Array)
 am = ex["attention_mask"].int()   # int32
 
+print(f"모드: {'int8 양자화(XNNPACK)' if QUANT else ('XNNPACK fp32' if USE_XNNPACK else 'portable fp32')}")
+
 # ── encoder ──
 enc = Encoder(model).eval()
 eseq = Dim("eseq", min=2, max=512)
 print("[encoder] export ...")
-with torch.no_grad():
-    ep = export(enc, (ii, am),
-                dynamic_shapes=({0: STATIC, 1: eseq}, {0: STATIC, 1: eseq}))
-mb = save_pte(lower(ep), os.path.join(OUT, "encoder.pte"))
+mb = save_pte(export_and_lower(enc, (ii, am),
+              ({0: STATIC, 1: eseq}, {0: STATIC, 1: eseq})), os.path.join(OUT, "encoder.pte"))
 print(f"✅ encoder.pte {mb:.1f} MB")
 
 # ── decoder (단일 스텝) ──
@@ -86,9 +111,8 @@ dec = Decoder(model).eval()
 eseq2 = Dim("eseq2", min=2, max=512)
 dseq = Dim("dseq", min=1, max=64)
 print("[decoder] export ...")
-with torch.no_grad():
-    dp = export(dec, (dec_ids, enc_hidden, am),
-                dynamic_shapes=({0: STATIC, 1: dseq}, {0: STATIC, 1: eseq2, 2: STATIC}, {0: STATIC, 1: eseq2}))
-mb = save_pte(lower(dp), os.path.join(OUT, "decoder.pte"))
+mb = save_pte(export_and_lower(dec, (dec_ids, enc_hidden, am),
+              ({0: STATIC, 1: dseq}, {0: STATIC, 1: eseq2, 2: STATIC}, {0: STATIC, 1: eseq2})),
+              os.path.join(OUT, "decoder.pte"))
 print(f"✅ decoder.pte {mb:.1f} MB")
 print("완료: encoder.pte + decoder.pte")
