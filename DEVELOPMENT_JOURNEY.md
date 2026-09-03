@@ -12,6 +12,7 @@
 
 | 시점 | 구분 | 한 일 | 관련 |
 |---|---|---|---|
+| 2026-09-04 | result | **STT q5 양자화 성공** — whisper.cpp 프리빌트 whisper-quantize로 f16 487MB→q5_0 175MB(−64%), 인식 동일. STT q5 + 변환기 int8 → 온디바이스 총 ~1.2GB→**~490MB**(−60%). 앱 STT 경로 q5로 갱신 | B-15 |
 | 2026-09-04 | result | **변환기 int8 양자화 성공** — torchao weight-only int8(Int8WeightOnlyConfig)로 PT2E 임베딩 이슈 우회. 변환기 **587MB→314MB**(enc138+dec176), 정확도 완전 유지(출력 동일). STT gguf q5는 C 빌드 필요로 후속 | B-15 |
 | 2026-09-04 | result | **🏆 standalone 릴리스 데모 완주** — `assembleRelease`(디버그 키 서명·minify off)로 JS 포함 독립 APK(160MB) 빌드·설치. **USB·PC·metro 없이 폰만으로** 새 디자인+온디바이스 파이프라인 동작. 덮어설치로 모델 유지 | B-15 |
 | 2026-09-04 | result | **🏆 실기기 온디바이스 E2E 완주** — Galaxy S24(arm64)에서 녹음→whisper.rn STT→executorch 변환→표준어까지 **서버 없이** 동작 확인. 함정 해결: splash-screen 네이티브 크래시(설치), scoped storage(내부 dir 로드), whisper.rn WAV 파일로딩 실패(base64 data URI 우회), fileUri 이중접두. 3개 네이티브 모듈(whisper.rn·executorch·audio-studio) 공존 | B-15 |

@@ -23,7 +23,7 @@ import { loadPipeline, runPipeline } from './src/ondevicePipeline';
 // 온디바이스 모델 경로 = 앱 내부 files 디렉터리(네이티브 fopen 항상 가능; scoped storage 무관).
 // 테스트: adb push→외부→run-as로 내부 복사. 배포: 첫 실행 다운로드→documentDirectory.
 const MODELS = {
-  sttModel: `${documentDirectory}ggml-model-f16.bin`,
+  sttModel: `${documentDirectory}ggml-model-q5_0.bin`,
   encoder: `${documentDirectory}encoder.pte`,
   decoder: `${documentDirectory}decoder.pte`,
   tokenizer: `${documentDirectory}tokenizer.json`,
