@@ -1,101 +1,98 @@
-# 사투리 → 표준어 음성 번역기
+# 알아 묵나? — 사투리 → 표준어 음성 번역 (온디바이스)
 
-4지역(경상·전라·충청·강원) 사투리 음성을 녹음하면 **표준어 텍스트로 변환**하는 안드로이드 앱. 표준 음성/언어 모델이 잘 못하는 **사투리 영역을 AI Hub 방언 데이터로 파인튜닝해 개선**하는 것이 핵심이다.
+충청·강원·전라·경상 **사투리 음성**을 녹음하면 **표준어 텍스트로 바꿔주는** 안드로이드 앱. 음성 인식과 번역을 **서버 없이 휴대폰 안에서(온디바이스)** 처리한다. 표준 음성/언어 모델이 약한 **사투리 영역을 AI Hub 방언 데이터로 파인튜닝해 개선**하고, 그 모델을 양자화해 오프라인으로 동작시키는 것이 핵심이다.
 
----
+![알아 묵나](docs/store-assets/feature-graphic.png)
 
-## 제작 목적
+## 데모 (실기기 · Galaxy S24)
 
-부모·조부모 세대의 사투리를 잘 못 알아듣는 자녀 세대, 사투리 콘텐츠 자막화·고객센터 등에서 쓸 수 있는 어플. 표준 Whisper는 사투리 발음/억양에서, 규칙 기반 변환은 다양한 방언 표현에서 한계가 있다. 이 격차를 **데이터로 좁힌다.**
+| 표준어 입력은 그대로 | 사투리는 표준어로 변환 |
+|---|---|
+| <img src="docs/screenshots/ondevice-e2e-01-standard.png" width="260"> | <img src="docs/screenshots/ondevice-e2e-02-dialect.png" width="260"> |
+| "안녕하세요" → "안녕하세요" | "응 억수로" → "응 **대단히**" |
 
-## 파이프라인
+신규 설치 → 첫 실행 시 모델(~490MB) 다운로드 → 이후 **완전 오프라인**으로 녹음·인식·번역. 실기기 처리 **7~8초**(arm).
+
+## 핵심 성과
+
+- **데이터로 두 단계 모두 개선** — 표준 모델이 못하는 사투리를 파인튜닝으로 정량 개선
+  - STT(Whisper) 사투리 인식 CER **20.3% → 11.7%** (4지역 LoRA, held-out val)
+  - 변환(KoBART) copy 기준 대비 CER **5.79% → 1.63%** (4지역), 정확일치 26.5% → 77.7%
+  - End-to-End(음성→표준어) 조용한 환경 CER **~8.5%**
+- **온디바이스** — 서버 비용 0, 오프라인 동작, 음성이 기기를 벗어나지 않음(프라이버시)
+- **양자화로 무손실 경량화** — 총 **1.2GB → 490MB**(−60%)인데 CER 저하 없음
+  - STT q5_0: 487→175MB, 동일 val 120파일 f16 대비 **−0.35%p(오히려 우세)**
+  - 변환기 int8(ExecuTorch): 587→314MB, PyTorch 대비 생성 정합성 5/5 일치
+
+정량 지표·표는 [EVALUATION.md](EVALUATION.md), 설계·의사결정 기록은 [DEVELOPMENT_JOURNEY.md](DEVELOPMENT_JOURNEY.md).
+
+## 파이프라인 (전부 온디바이스)
 
 ```
-음성 ──[① STT: Whisper]──▶ 사투리 텍스트 ──[② 변환: KoBART]──▶ 표준어 텍스트
-       (사투리 음성 인식)                    (사투리→표준어 재작성)
+음성 ──[① STT: Whisper q5]──▶ 사투리 텍스트 ──[② 변환: KoBART int8]──▶ 표준어 텍스트
+       (사투리 음성 인식)                        (사투리→표준어 재작성)
 ```
 
-- **① STT** — Whisper. 표준 Whisper를 4지역 방언 음성으로 **LoRA 파인튜닝**(경상·전라·충청·강원). held-out 전체 val에서 **CER 20.3%→11.7%**(상세 [EVALUATION.md](EVALUATION.md)). 서빙은 파인튜닝 모델을 transformers로 직접.
-- **② 변환** — `KoBART` seq2seq를 사투리→표준어 문장쌍으로 파인튜닝(4지역 완료). 완벽STT 가정 시 CER 0.5%로 거의 무손실.
-- 앱은 얇게: 녹음 → 서버(FastAPI) 전송 → 결과 표시.
+- **① STT** — Whisper-small을 4지역 방언 음성으로 **LoRA 파인튜닝** → GGUF **q5_0** 양자화 → [whisper.rn](https://github.com/mybigday/whisper.rn)(whisper.cpp)로 기기에서 실행.
+- **② 변환** — `gogamza/kobart-base-v2`를 사투리→표준어 문장쌍으로 파인튜닝 → ExecuTorch **.pte(int8 weight-only)** export → [react-native-executorch](https://github.com/software-mansion/react-native-executorch)로 encoder 1회 + decoder greedy 루프 실행. 토크나이저·생성 루프를 앱에서 직접 구현.
+- 녹음은 `@siteed/expo-audio-studio`로 16kHz mono PCM WAV. 결과는 화면에만 표시.
 
 ## 핵심 접근 — 데이터로 개선
 
-AI Hub 경상도 방언 라벨을 전처리해 **208만 문장쌍**을 확보했고, 분석 결과:
+AI Hub 방언 라벨을 전처리해 **208만 문장쌍**을 확보했고, 이 중 실제 방언 변형(사투리≠표준)은 **33.6만(16.1%)**. 가장 흔한 치환은 `쫌`→`조금`, `이케`→`이렇게`, `그니까`→`그러니까`, `니`→`너`, `걍`→`그냥` … 규칙 사전으로 다 담기 어려운 이 다양성을 **모델이 데이터로 학습**한다.
 
-| 지표 | 값 |
-|------|-----|
-| 총 문장쌍 | 2,088,334 |
-| 실제 방언 변형(사투리≠표준) | 336,121 (16.1%) |
-| 가장 흔한 치환 | `쫌`→`조금` (139,427회), `이케`→`이렇게`, `그니까`→`그러니까`, `니`→`너`, `걍`→`그냥` … |
+| 단계 | 기준선(copy/표준) | 파인튜닝 후 |
+|---|---|---|
+| STT (4지역, CER) | 20.3% | **11.7%** |
+| 변환 (4지역, CER) | 5.79% | **1.63%** |
+| 변환 (4지역, 정확일치) | 26.5% | **77.7%** |
 
-→ 규칙 사전으로는 다 담기 어려운 이 다양한 변형을 **모델이 데이터로 학습**한다. KoBART 변환 모델은 '그대로 두기(copy)' 기준선 대비 크게 개선됐다:
-- **경상도 단일**: CER 4.62% → 1.01%, 정확일치 29.6% → 82.2%
-- **4지역(경상·전라·충청·강원)**: CER 5.79% → 1.63%, 정확일치 26.5% → 77.7%
-
-그리고 **STT(Whisper)** 도 4지역 방언 음성 LoRA 파인튜닝으로 표준 대비 사투리 인식 CER을 **20.3% → 11.7%(4지역 가중평균, held-out 전체 val)** 로 낮췄다(상세 [EVALUATION.md](EVALUATION.md)). 즉 음성 인식·표준어 변환 **두 단계 모두** "표준 모델이 못하는 것을 데이터로 개선"을 정량 증명했다.
-
-**사용자 체감(End-to-End, 음성→표준어)**: 조용한 환경 CER **~8.5%**(문자 ~91.5% 정확), 실제 폰+생활소음 **~20%**. 소음 증강·beam search·충청 보강으로 개선했고, whisper.cpp/ONNX int8 양자화 시 정확도 손실 ~0(≈370MB)로 **온디바이스 실현가능성도 검증**했다. 상세 지표·표는 [EVALUATION.md](EVALUATION.md).
-
-전체 분석은 [data/analysis.md](data/analysis.md), 파인튜닝 설계·근거는 [why_finetune.md](why_finetune.md) 참고.
+전체 분석 [data/analysis.md](data/analysis.md), 파인튜닝 근거 [why_finetune.md](why_finetune.md).
 
 ## 기술 스택
 
-- **앱**: React Native (Expo SDK 57), `expo-audio` 녹음, `expo-file-system` 업로드
-- **백엔드**: FastAPI, `faster-whisper`(STT), KoBART(변환)
-- **학습**: HuggingFace `transformers`, Google Colab 무료 GPU
-- **데이터**: AI Hub 「한국어 방언 발화」(경상도·전라도·충청도·강원도), 표준 라이브러리 기반 전처리
+- **앱/런타임**: React Native (Expo SDK 57, New Architecture), whisper.rn(GGUF), react-native-executorch(ExecuTorch), @siteed/expo-audio-studio, 첫 실행 모델 다운로드(GitHub Releases 호스팅)
+- **학습**: HuggingFace `transformers` + `peft`(LoRA), Colab GPU
+- **양자화/변환**: whisper.cpp(q5 GGUF), ExecuTorch export(torchao int8 weight-only)
+- **개발용 백엔드**: FastAPI — 학습 중 서빙·평가에 사용(런타임 서버 아님)
+- **데이터**: AI Hub 「한국어 방언 발화」(충청·강원·전라·경상)
 
 ## 데이터 출처 및 이용 고지
 
-- 본 프로젝트의 학습 데이터 출처는 **AI 허브(AI Hub, aihub.or.kr)** 「한국어 방언 발화」(경상도·전라도·충청도·강원도) 데이터셋이다.
-- 공개·배포 대상은 **파인튜닝으로 생성된 학습 결과물(모델)** 이며, **원본 음성·전사 데이터 및 이를 가공·추출한 자료(클립·라벨 등)는 저장소·앱에 포함하지 않고 재배포하지 않는다**(AI 허브 데이터 이용정책 준수). 해당 산출물은 `.gitignore`로 제외된다.
-- 데이터셋별 이용조건은 각 AI 허브 데이터셋 페이지의 이용정책을 따른다.
+- 학습 데이터 출처는 **AI 허브(aihub.or.kr)** 「한국어 방언 발화」 데이터셋이다.
+- 공개·배포 대상은 **파인튜닝 결과물(모델)** 이며, **원본 음성·전사 및 이를 가공·추출한 자료는 저장소·앱에 포함하지 않고 재배포하지 않는다**(AI 허브 이용정책 준수). 해당 산출물은 `.gitignore`로 제외.
+- 앱 화면·개인정보처리방침에 출처를 명시한다.
 
 ## 저장소 구조
 
 ```
-backend/      FastAPI 서버 (STT + 변환 파이프라인)
-mobile/       React Native(Expo) 앱
-data/         AI Hub 전처리·분석 스크립트 (원본 데이터는 미포함)
-notebooks/    Colab 노트북 (데이터 준비, KoBART 파인튜닝)
-DEVELOPMENT_JOURNEY.md   개발 기록(설계·의사결정·문제해결)
-why_finetune.md          파인튜닝 모델·방식·하이퍼파라미터 근거
+mobile/      React Native(Expo) 온디바이스 앱 (STT+변환, 첫 실행 모델 다운로드)
+backend/     모델 export·양자화·평가 스크립트 (개발용)
+training/    STT/변환 파인튜닝·평가 스크립트
+data/        AI Hub 전처리·분석 (원본 미포함)
+docs/        평가·개발기록·출시 체크리스트·개인정보방침·스토어 자산
 ```
 
-## 실행
+## 실행 (개발)
 
-**백엔드**
-```bash
-cd backend
-python -m venv .venv && .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-**앱** (에뮬레이터 또는 Expo Go)
 ```bash
 cd mobile
 npm install
-npm run android
+npx expo run:android      # 개발 빌드. 첫 실행 시 모델(~490MB) 다운로드 후 오프라인 동작
 ```
-자세한 실행·서버 연결은 [backend/README.md](backend/README.md), [mobile/README.md](mobile/README.md).
 
-**데이터 전처리** (AI Hub 데이터는 한국 IP에서 직접 다운로드)
-```bash
-python data/preprocess.py --raw <AIHub_추출경로> --out data/processed
-python data/build_mt_dataset.py       # 변환 학습셋(균형)
-```
+> 릴리스 빌드/서명·플레이스토어 준비는 [docs/release-checklist.md](docs/release-checklist.md) 참고.
+> 데이터 전처리·파인튜닝 재현은 [data/](data/), [training/](training/), [notebooks/](notebooks/).
 
 ## 현재 상태
 
-- [x] 백엔드 E2E 파이프라인 (STT + 변환 API)
-- [x] 앱 뼈대 + "한지×클린" 디자인, 녹음→변환 왕복 확인
 - [x] AI Hub 전처리 + 208만 문장쌍 + 데이터 분석
-- [x] KoBART 변환 모델 파인튜닝 — 경상 단일 **CER 4.6%→1.0%**, 4지역 통합 **CER 5.8%→1.6%** (copy 대비) + 백엔드 연동
-- [x] Whisper STT 4지역 LoRA 파인튜닝 — 표준 대비 **CER 20.3%→11.7%**(held-out 전체 val) + 소음 증강·beam search·충청 보강
-- [x] End-to-End 평가 — 음성→표준어 CER **~8.5%**(조용) / ~20%(실제 폰+소음), 상세 [EVALUATION.md](EVALUATION.md)
-- [x] 온디바이스 양자화 실현가능성 검증 — int8 정확도 손실 ~0, 총 ~370MB
-- [ ] 온디바이스 네이티브 통합 + 플레이스토어 배포
+- [x] 변환(KoBART) 4지역 파인튜닝 — copy 대비 **CER 5.8%→1.6%**
+- [x] STT(Whisper) 4지역 LoRA + 소음 증강 — 표준 대비 **CER 20.3%→11.7%**
+- [x] End-to-End 평가 — 음성→표준어 CER **~8.5%**(조용), 상세 [EVALUATION.md](EVALUATION.md)
+- [x] **온디바이스 통합** — whisper.rn + ExecuTorch, 실기기 E2E 동작(7~8초)
+- [x] **양자화** — 1.2GB→490MB, CER 저하 없음(정량 검증)
+- [x] **아이덴티티·배포 준비** — 앱 이름·아이콘, 개인정보방침 호스팅, 스토어 자산, 서명 AAB
+- [ ] 플레이스토어 비공개 테스트 → 출시
 
-진행 상세는 [DEVELOPMENT_JOURNEY.md](DEVELOPMENT_JOURNEY.md).
+진행 상세 [DEVELOPMENT_JOURNEY.md](DEVELOPMENT_JOURNEY.md).
