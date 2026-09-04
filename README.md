@@ -6,6 +6,10 @@
 
 ## 데모 (실기기 · Galaxy S24)
 
+<p align="center"><img src="docs/screenshots/demo.gif" width="300" alt="알아 묵나 데모 — 억수로→대단히"></p>
+
+<p align="center"><em>"이거 억수로 맛있다" → "이거 대단히 맛있다" · 서버 없이 기기 안에서 (GIF는 소리 없음)</em></p>
+
 | 표준어 입력은 그대로 | 사투리는 표준어로 변환 |
 |---|---|
 | <img src="docs/screenshots/ondevice-e2e-01-standard.png" width="260"> | <img src="docs/screenshots/ondevice-e2e-02-dialect.png" width="260"> |
