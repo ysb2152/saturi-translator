@@ -46,6 +46,15 @@ const LINE = '#EBE0CC';        // 크림 위 헤어라인
 
 const haptic = (style) => { try { Haptics.impactAsync(style); } catch (_) {} };
 
+const MAX_REC_MS = 20000; // 녹음 최대 20초(런어웨이·과도한 처리 방지)
+
+// 임시 녹음 WAV 삭제(file:/ 경로 정규화 후)
+const deleteWav = async (uri) => {
+  if (!uri) return;
+  const norm = uri.startsWith('file:') ? uri : `file://${uri.replace(/^\/+/, '/')}`;
+  try { await deleteAsync(norm, { idempotent: true }); } catch (_) {}
+};
+
 export default function App() {
   const pcm = usePcmRecorder();
 
@@ -66,6 +75,7 @@ export default function App() {
   const appear = useRef(new Animated.Value(0)).current;  // 결과 등장
   const shimmer = useRef(new Animated.Value(0)).current; // 변환 중 스켈레톤
   const prog = useRef(new Animated.Value(0)).current;    // 준비 진행바
+  const recTimer = useRef(null);                          // 녹음 최대시간 타이머
 
   // 녹음 중: 숨쉬는 링
   useEffect(() => {
@@ -144,6 +154,10 @@ export default function App() {
 
   useEffect(() => { prepare(); }, [prepare]);
 
+  const clearRecTimer = () => {
+    if (recTimer.current) { clearTimeout(recTimer.current); recTimer.current = null; }
+  };
+
   const startRecording = async () => {
     setError(null);
     setResult(null);
@@ -152,12 +166,16 @@ export default function App() {
       // 16kHz mono 16-bit PCM WAV (whisper.rn 입력 요건)
       await pcm.startRecording({ sampleRate: 16000, channels: 1, encoding: 'pcm_16bit' });
       setStatus('음성 녹음 중이에요');
+      // 최대 길이 초과 시 자동 정지→변환
+      clearRecTimer();
+      recTimer.current = setTimeout(() => { recTimer.current = null; stopAndSend(); }, MAX_REC_MS);
     } catch (e) {
       setError(`녹음을 시작하지 못했어요: ${e.message}`);
     }
   };
 
   const stopAndSend = async () => {
+    clearRecTimer();
     haptic(Haptics.ImpactFeedbackStyle.Medium);
     let uri = null;
     try {
@@ -175,12 +193,19 @@ export default function App() {
       setStatus('문제가 생겼어요');
     } finally {
       setBusy(false);
-      // 처리 끝난 임시 녹음 파일 삭제(누적 방지). 파이프라인이 이미 읽은 뒤라 안전.
-      if (uri) {
-        const norm = uri.startsWith('file:') ? uri : `file://${uri.replace(/^\/+/, '/')}`;
-        try { await deleteAsync(norm, { idempotent: true }); } catch (_) {}
-      }
+      await deleteWav(uri); // 처리 끝난 임시 녹음 파일 삭제(파이프라인이 이미 읽은 뒤라 안전)
     }
+  };
+
+  // 녹음 취소: 변환하지 않고 버림
+  const cancelRecording = async () => {
+    clearRecTimer();
+    haptic(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const rec = await pcm.stopRecording();
+      await deleteWav(rec && rec.fileUri);
+    } catch (_) {}
+    setStatus('버튼을 누르고 사투리로 말해보세요');
   };
 
   const onPressMic = () => {
@@ -188,6 +213,9 @@ export default function App() {
     if (recording) stopAndSend();
     else startRecording();
   };
+
+  // 언마운트 시 타이머 정리
+  useEffect(() => clearRecTimer, []);
 
   const disabled = !permissionGranted || busy || loadingModels;
   const ringStyle = {
@@ -283,6 +311,16 @@ export default function App() {
         {/* ── 정중앙 문구(마이크 ↔ 출처 사이 동일 간격) ── */}
         <View style={styles.between}>
           <Text style={[styles.status, recording && styles.statusRec]}>{status}</Text>
+          {recording && (
+            <Pressable
+              onPress={cancelRecording}
+              accessibilityRole="button"
+              accessibilityLabel="녹음 취소"
+              style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.cancelText}>취소</Text>
+            </Pressable>
+          )}
           {loadingModels && downloadPct != null && (
             <>
               <View style={styles.progressTrack}>
@@ -422,6 +460,11 @@ const styles = StyleSheet.create({
     backgroundColor: TEAL_BRIGHT,
   },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  cancelBtn: {
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1, borderColor: CLAY, backgroundColor: '#FFFFFFCC',
+  },
+  cancelText: { color: CLAY, fontSize: 14, fontWeight: '600' },
 
   // 결과 카드(클린)
   results: { width: '100%', alignItems: 'center' },
