@@ -3,7 +3,8 @@
 실제 코드·설정(app.json, eas.json, AndroidManifest, build.gradle, App.js, 파이프라인/다운로드)을 직접 확인해 정리. `✅ 완료 / ⚠️ 조치 필요 / ❌ 미완/블로커`.
 
 ## ✅ 코드 작업 1차 완료 (2026-09-04)
-- **권한 정리(B)**: config plugin [`plugins/withCleanPermissions.js`](../mobile/plugins/withCleanPermissions.js)로 `SYSTEM_ALERT_WINDOW`·`FOREGROUND_SERVICE(_MEDIA_PLAYBACK)`·미사용 `AudioControlsService`(expo-audio 재생 컨트롤, 앱 미사용) 제거. app.json 등록·모의 검증 완료. → **다음 prebuild/빌드 시 적용, 실기기에서 녹음 정상 재확인 필요.**
+- **권한 정리(B)**: config plugin [`plugins/withCleanPermissions.js`](../mobile/plugins/withCleanPermissions.js)로 `SYSTEM_ALERT_WINDOW` 제거. **prebuild→빌드→실기기 설치→녹음 정상 검증 완료(2026-09-04).** `FOREGROUND_SERVICE(_MEDIA_PLAYBACK)`·`AudioControlsService`(expo-audio 재생 컨트롤, 앱 미사용)도 제거 후보였으나, 녹음(핵심 기능) 영향을 깨끗한 기기에서 재검증하기 전까지 **보수적으로 유지**. Play 제출 시 제거+재검증 또는 Play Console 전경서비스 선언으로 처리.
+  - ⚠️ **디버깅 교훈**: 이날 테스트 중 녹음이 무음(RMS=0)으로 잡혀 권한 제거를 의심했으나, FGS 복원해도 무음 지속 → **기기 오디오 HAL이 반복 설치·강제종료로 일시 정지된 것**이 원인. **폰 재부팅 후 정상**(peak 0.30). 권한 제거와 무관. 향후 유사 증상 시 재부팅부터.
 - **다운로드 무결성/견고성(E1)**: 임시파일(.download)로 받고 **정확 바이트 크기 검증** 후에만 최종 이동 → 부분/손상 파일이 완결로 오인 안 됨. 실패 시 정리. **재시도 버튼** 추가(앱 재시작 불필요). Wi‑Fi 권장 안내 추가. (참고: 앱 재시작 간 진짜 byte-resume은 아직 미구현)
 - **녹음 파일 정리(E2)**: 처리 후 임시 WAV 삭제(누적 방지).
 - **접근성(E3)**: 마이크 버튼 accessibilityLabel/Role/State + 결과 텍스트 `selectable`(복사 가능).

@@ -1,22 +1,21 @@
 // CNG(android/ 자동생성)에서 매니페스트를 정리하는 config plugin.
-// 라이브러리가 끌어온, 이 앱이 쓰지 않는 항목을 제거해 Play 심사 마찰을 없앤다.
+// 라이브러리가 끌어온, 이 앱이 쓰지 않는 민감 권한을 제거해 Play 심사 마찰을 줄인다.
 //
 // 제거 대상:
-//  - SYSTEM_ALERT_WINDOW               : "다른 앱 위에 그리기" 민감권한. 미사용.
-//  - FOREGROUND_SERVICE(_MEDIA_PLAYBACK): expo-audio 재생 컨트롤(AudioControlsService)용.
-//    이 앱은 오디오 재생/미디어세션을 쓰지 않아 서비스가 시작되지 않음 → 권한·서비스 모두 제거.
+//  - SYSTEM_ALERT_WINDOW : "다른 앱 위에 그리기" 민감권한. 미사용 → 제거(실기기 녹음 정상 검증됨, 2026-09-04).
 //
-// 검증: 다음 실기기 테스트에서 녹음이 정상인지 확인(녹음은 @siteed/expo-audio-studio가
-// 전경서비스 없이 수행). 만에 하나 문제가 있으면 RM_PERMS/RM_SERVICES에서 해당 항목을 빼면 됨.
+// FOREGROUND_SERVICE(_MEDIA_PLAYBACK) 및 AudioControlsService(expo-audio 재생 컨트롤)는
+// 앱이 실제로 쓰지 않아 제거 후보였으나, 녹음(핵심 기능)에 영향이 없는지 깨끗한 기기에서
+// 재검증 전까지는 보수적으로 유지한다. Play 제출 시엔 (a) 이들을 제거+재검증하거나
+// (b) Play Console 전경서비스 선언으로 처리. (오늘 무음은 기기 오디오 HAL 일시정지가 원인이었고
+//  권한 제거와 무관함이 재부팅으로 확인됨.)
 
 const { withAndroidManifest } = require('@expo/config-plugins');
 
 const RM_PERMS = [
   'android.permission.SYSTEM_ALERT_WINDOW',
-  'android.permission.FOREGROUND_SERVICE',
-  'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
 ];
-const RM_SERVICES = ['expo.modules.audio.service.AudioControlsService'];
+const RM_SERVICES = [];
 
 module.exports = function withCleanPermissions(config) {
   return withAndroidManifest(config, (cfg) => {
