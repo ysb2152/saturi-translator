@@ -51,3 +51,9 @@ backend/samples/
 # 소음 데이터(다운로드 산출물, 학습 전용)
 data/musan.tar.gz
 data/noise/
+
+# 릴리스 서명 키(절대 커밋 금지)
+mobile/credentials/
+
+# 빌드 산출물 백업(커밋 안 함)
+mobile/artifacts/
