@@ -12,7 +12,7 @@ import {
 
 // 모델 호스팅 베이스(깃헙 릴리스). 파일명은 앱이 로드하는 이름과 동일.
 export const MODELS_BASE_URL =
-  'https://github.com/ysb2152/translate/releases/download/models-v1';
+  'https://github.com/ysb2152/saturi-translator/releases/download/models-v1';
 
 // name = 저장/로드 파일명, bytes = 릴리스 에셋의 정확한 바이트 크기(무결성 검증용)
 const FILES = [

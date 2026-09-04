@@ -14,8 +14,8 @@
 
 | # | 항목 | 상태 | 내용 |
 |---|---|---|---|
-| A1 | **릴리스 서명** | ❌ | `android/app/build.gradle`의 `release`가 **debug 키로 서명**(`signingConfig signingConfigs.debug`). 디버그 서명 AAB는 Play 업로드 불가. → **EAS `production` 빌드 사용 시 EAS가 업로드 키스토어를 자동 생성·관리**(권장). 로컬 gradlew로 낼 거면 릴리스 keystore 수동 생성 필요. |
-| A2 | **AAB 빌드** | ✅ | `eas.json` production = `app-bundle`. 설정은 이미 맞음. |
+| A1 | **릴리스 서명** | ✅ | 업로드 keystore 생성(`mobile/credentials/upload-keystore.jks`, gitignore·비밀번호는 CREDENTIALS.txt). SHA256 `A1:93:4C:94:E1:90:28:4C:28:D9:5C:58:1C:74:C0:2E:78:BC:05:8C:35:C4:05:88:79:8B:C7:86:72:36:0F:2F`. **⚠️ 키·비밀번호 안전 보관 필수(유실 시 업로드 키 재설정 필요).** |
+| A2 | **AAB 빌드** | ✅ | 서명된 AAB 생성·검증 완료(91MB, "jar verified", CN=ysb2152). 위치 `mobile/android/app/build/outputs/bundle/release/app-release.aab`. 재빌드: `cd mobile/android && ./gradlew.bat bundleRelease -PMYAPP_UPLOAD_STORE_FILE=<절대경로> -PMYAPP_UPLOAD_STORE_PASSWORD=<pw> -PMYAPP_UPLOAD_KEY_ALIAS=upload -PMYAPP_UPLOAD_KEY_PASSWORD=<pw>` (비밀번호는 CREDENTIALS.txt). ⚠️ CNG라 `expo prebuild` 재실행 시 build.gradle 서명 스니펫이 초기화되니, 그때는 스니펫 재적용 또는 EAS 사용. |
 | A3 | **Play 개발자 계정** | ❌ | $25 일회성 + **본인 신원 확인**(요즘 며칠 걸림). |
 | A4 | **신규 개인계정 비공개 테스트 의무** | ❌ | 2023-11 이후 만든 **개인** 개발자 계정은 프로덕션 출시 전 **테스터 12명 이상이 14일 연속 비공개 테스트**에 참여해야 함. 일정에 큰 영향 — 미리 시작할 것. (법인 계정은 면제) |
 
@@ -38,7 +38,7 @@ AndroidManifest에 앱이 **쓰지 않는데 라이브러리(@siteed/expo-audio-
 | # | 항목 | 상태 | 내용 |
 |---|---|---|---|
 | C1 | 개인정보처리방침 문서 | ✅ | 온디바이스 기준 재작성 완료(`docs/privacy-policy.md`) |
-| C2 | 방침 **공개 URL 호스팅** | ✅ | GitHub Pages 게시: **https://ysb2152.github.io/translate/privacy-policy.html** (main/docs, HTTP 200 확인) |
+| C2 | 방침 **공개 URL 호스팅** | ✅ | GitHub Pages 게시: **https://ysb2152.github.io/saturi-translator/privacy-policy.html** (main/docs, HTTP 200 확인) |
 | C3 | 방침 **연락처 이메일** | ✅ | ysb2152@gmail.com (개발자 이메일과 통일) |
 | C4 | **Data Safety 양식** | ❌ | Play Console 작성. 우리 앱=수집·공유 없음, RECORD_AUDIO는 온디바이스, INTERNET은 모델 다운로드. 방침과 일치해야 함 |
 | C5 | **콘텐츠 등급**(IARC 설문) | ❌ | 전연령 예상 |

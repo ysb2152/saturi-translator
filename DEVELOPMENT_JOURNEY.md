@@ -4,7 +4,7 @@
 
 - 프로젝트: 사투리 → 표준어 음성 번역 안드로이드 앱. 사투리 음성을 녹음하면 표준어 텍스트로 바꿔 준다.
 - 스택: React Native(Expo) 프론트, FastAPI + Python 백엔드, Whisper(STT)·KoBART(사투리→표준어 변환), AI Hub 한국어 방언 데이터, 로컬 GPU(RTX 3080) 학습.
-- 저장소: https://github.com/ysb2152/translate (public, 임시명 `translate`. backend/mobile 모노 구조).
+- 저장소: https://github.com/ysb2152/saturi-translator (public, 임시명 `translate`. backend/mobile 모노 구조).
 
 ---
 
