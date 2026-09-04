@@ -160,7 +160,7 @@ STT 추론 엔진은 faster-whisper(CTranslate2)로 정했다. 개발 PC에 시�
 
 ## B-6. GitHub 저장소 구성
 
-코드와 개발기록을 함께 관리하려고 GitHub 공개 저장소 `translate`(임시명)를 만들었다. backend/mobile 모노 구조 그대로 올리고, 이후 이 `DEVELOPMENT_JOURNEY.md`를 커밋과 함께 갱신한다.
+코드와 개발기록을 함께 관리하려고 GitHub 공개 저장소 `translate`(임시명, 이후 `saturi-translator`로 변경)를 만들었다. backend/mobile 모노 구조 그대로 올리고, 이후 이 `DEVELOPMENT_JOURNEY.md`를 커밋과 함께 갱신한다.
 
 첫 커밋에서 함정이 하나 있었다. `create-expo-app`이 `mobile/`을 만들 때 내부에 자체 `.git`을 초기화해 둬서, 루트에서 `git add`를 하면 `mobile`이 파일이 아니라 서브모듈(gitlink, mode 160000)로 잡혔다. 이대로 올리면 앱 소스가 빠진다. `mobile/.git`을 제거하고 인덱스의 gitlink를 강제로 지운 뒤(`git rm --cached -f mobile`) 다시 추가해 앱 소스를 정상 포함시켰다. 무거운 산출물(node_modules, .venv, tmp, dist)은 루트와 하위 `.gitignore`로 제외했다.
 
@@ -234,7 +234,7 @@ STT용 음성(28GB)이 용량·지오블록으로 막혀 있는 동안, **음성
 
 **컴포넌트 평가 → End-to-End.** STT(CER)와 변환(copy 대비)을 따로만 재다가, "사용자가 실제로 체감하는 정확도"는 음성→표준어 전체를 거친 결과라는 점에서 E2E 평가가 필요하다고 판단했다. 문제는 STT val 클립에 사투리 전사만 저장해 표준어 정답이 없던 것(라벨도 이미 삭제). 처음엔 변환기 MT 데이터의 {사투리:표준} 사전으로 역참조했으나, MT와 STT 오디오가 서로 다른 세션이라 커버리지가 2~200개로 낮아 실패했다. 그래서 라벨을 다시 받아 **클립의 stem+발화index로 표준어(standard_form)를 직접 매칭**하니 4지역 100% 매칭이 됐다. 또 "평가는 실제 서빙 조건과 일치해야 한다"는 원칙으로 E2E의 STT 디코딩을 서빙과 동일한 beam으로 맞췄고, clean뿐 아니라 소음 합성(phone+SNR10 등)까지 재 실환경 지표를 확보했다.
 
-**온디바이스는 "검증 먼저, 통합 나중".** 네이티브 통합(whisper.cpp/onnxruntime + 커스텀 EAS 빌드)은 호흡이 긴 작업이라, 그 전에 "양자화해도 정확도가 버티나 + 용량이 얼마인가"를 먼저 확인하기로 했다. 실제 배포 경로인 CTranslate2 int8 변환은 ct2-transformers-converter가 transformers 4.47과 `dtype` 인자에서 충돌해 실패했고, whisper.cpp는 C 빌드가 필요해, **torch 동적 int8을 보수적 프록시**로 써서 검증했다(STT +0.25%p, KoBART +0.00%p, 총 ~370MB). 이 순서 덕에 "온디바이스가 현실적인가"를 큰 통합 작업 전에 저비용으로 판가름냈다.
+**온디바이스는 "검증 먼저, 통합 나중".** 네이티브 통합(whisper.cpp/onnxruntime + 커스텀 EAS 빌드)은 호흡이 긴 작업이라, 그 전에 "양자화해도 정확도가 버티나 + 용량이 얼마인가"를 먼저 확인하기로 했다. 실제 배포 경로인 CTranslate2 int8 변환은 ct2-transformers-converter가 transformers 4.47과 `dtype` 인자에서 충돌해 실패했고, whisper.cpp는 C 빌드가 필요해, **torch 동적 int8을 보수적 프록시**로 써서 검증했다(STT +0.25%p, KoBART +0.00%p, 총 ~370MB). 이 순서 덕에 "온디바이스가 현실적인가"를 큰 통합 작업 전에 저비용으로 판가름냈다. (이 ~370MB는 프록시 추정치이고, 실제 배포는 whisper.cpp q5 + ExecuTorch int8로 **490MB**가 됐다 — 프록시보다 컸지만 여전히 다운로드로 충분히 담긴다.)
 
 ## B-13. 데이터 라이선스·배포 판단
 
