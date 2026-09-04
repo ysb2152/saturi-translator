@@ -37,6 +37,8 @@
 - **② 변환** — `gogamza/kobart-base-v2`를 사투리→표준어 문장쌍으로 파인튜닝 → ExecuTorch **.pte(int8 weight-only)** export → [react-native-executorch](https://github.com/software-mansion/react-native-executorch)로 encoder 1회 + decoder greedy 루프 실행. 토크나이저·생성 루프를 앱에서 직접 구현.
 - 녹음은 `@siteed/expo-audio-studio`로 16kHz mono PCM WAV. 결과는 화면에만 표시.
 
+통합 과정의 핵심 난관 해결(onnxruntime 실패→ExecuTorch 전환, 빈출력 버그, int8 임베딩 함정 등)은 [docs/ondevice-plan.md](docs/ondevice-plan.md).
+
 ## 핵심 접근 — 데이터로 개선
 
 AI Hub 방언 라벨을 전처리해 **208만 문장쌍**을 확보했고, 이 중 실제 방언 변형(사투리≠표준)은 **33.6만(16.1%)**. 가장 흔한 치환은 `쫌`→`조금`, `이케`→`이렇게`, `그니까`→`그러니까`, `니`→`너`, `걍`→`그냥` … 규칙 사전으로 다 담기 어려운 이 다양성을 **모델이 데이터로 학습**한다.
