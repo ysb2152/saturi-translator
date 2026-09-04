@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -15,7 +15,7 @@ import {
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
 import { useAudioRecorder as usePcmRecorder } from '@siteed/expo-audio-studio';
-import { documentDirectory } from 'expo-file-system/legacy';
+import { documentDirectory, deleteAsync } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 
 import { loadPipeline, runPipeline } from './src/ondevicePipeline';
@@ -57,6 +57,7 @@ export default function App() {
   const [modelsReady, setModelsReady] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [downloadPct, setDownloadPct] = useState(null); // 0..1, 다운로드 중일 때만
+  const [canRetry, setCanRetry] = useState(false);      // 준비 실패 시 재시도 노출
 
   const recording = pcm.isRecording;
 
@@ -109,35 +110,39 @@ export default function App() {
     Animated.timing(appear, { toValue: 1, duration: 460, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [result, appear]);
 
-  // 권한 + 모델 로드
-  useEffect(() => {
-    (async () => {
-      const { granted } = await requestRecordingPermissionsAsync();
-      setPermissionGranted(granted);
-      if (!granted) {
-        setStatus('마이크 권한이 필요해요. 설정에서 허용해 주세요.');
-        return;
-      }
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      setLoadingModels(true);
-      try {
-        // 첫 실행: 모델(~490MB) 다운로드. 이미 있으면 즉시 통과.
-        setStatus('처음이라 모델을 내려받고 있어요');
-        const downloaded = await ensureModels((p) => setDownloadPct(p));
-        setDownloadPct(null);
-        setStatus(downloaded ? '모델을 준비하고 있어요' : '온디바이스 모델을 준비하고 있어요');
-        await loadPipeline(MODELS);
-        setModelsReady(true);
-        setStatus('버튼을 누르고 사투리로 말해보세요');
-      } catch (e) {
-        setDownloadPct(null);
-        setError(`모델 준비 실패: ${String((e && e.message) || e)}`);
-        setStatus('모델을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.');
-      } finally {
-        setLoadingModels(false);
-      }
-    })();
+  // 권한 확인 + 모델 다운로드/로드 (실패 시 재시도 가능)
+  const prepare = useCallback(async () => {
+    setError(null);
+    setCanRetry(false);
+    const { granted } = await requestRecordingPermissionsAsync();
+    setPermissionGranted(granted);
+    if (!granted) {
+      setStatus('마이크 권한이 필요해요. 설정에서 허용해 주세요.');
+      setCanRetry(true);
+      return;
+    }
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+    setLoadingModels(true);
+    try {
+      // 첫 실행: 모델(~490MB) 다운로드. 이미 있으면 즉시 통과.
+      setStatus('처음이라 모델을 내려받고 있어요\n(약 490MB · Wi‑Fi 권장)');
+      const downloaded = await ensureModels((p) => setDownloadPct(p));
+      setDownloadPct(null);
+      setStatus(downloaded ? '모델을 준비하고 있어요' : '온디바이스 모델을 준비하고 있어요');
+      await loadPipeline(MODELS);
+      setModelsReady(true);
+      setStatus('버튼을 누르고 사투리로 말해보세요');
+    } catch (e) {
+      setDownloadPct(null);
+      setError(`모델 준비 실패: ${String((e && e.message) || e)}`);
+      setStatus('모델을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.');
+      setCanRetry(true);
+    } finally {
+      setLoadingModels(false);
+    }
   }, []);
+
+  useEffect(() => { prepare(); }, [prepare]);
 
   const startRecording = async () => {
     setError(null);
@@ -154,9 +159,10 @@ export default function App() {
 
   const stopAndSend = async () => {
     haptic(Haptics.ImpactFeedbackStyle.Medium);
+    let uri = null;
     try {
       const rec = await pcm.stopRecording();
-      const uri = rec && rec.fileUri;
+      uri = rec && rec.fileUri;
       if (!uri) { setError('녹음 파일을 찾지 못했어요.'); setStatus('버튼을 누르고 사투리로 말해보세요'); return; }
       if (!modelsReady) { setError('온디바이스 모델이 아직 준비되지 않았어요.'); return; }
       setBusy(true);
@@ -169,6 +175,11 @@ export default function App() {
       setStatus('문제가 생겼어요');
     } finally {
       setBusy(false);
+      // 처리 끝난 임시 녹음 파일 삭제(누적 방지). 파이프라인이 이미 읽은 뒤라 안전.
+      if (uri) {
+        const norm = uri.startsWith('file:') ? uri : `file://${uri.replace(/^\/+/, '/')}`;
+        try { await deleteAsync(norm, { idempotent: true }); } catch (_) {}
+      }
     }
   };
 
@@ -214,12 +225,12 @@ export default function App() {
             <Animated.View style={[styles.results, appearStyle]}>
               <View style={styles.cardIn}>
                 <Text style={styles.cardLabel}>인식된 사투리</Text>
-                <Text style={styles.cardTextIn}>{result.dialect_text || '음성을 알아듣지 못했어요'}</Text>
+                <Text selectable style={styles.cardTextIn}>{result.dialect_text || '음성을 알아듣지 못했어요'}</Text>
               </View>
               <View style={styles.arrow}><View style={styles.arrowDown} /></View>
               <View style={styles.cardOut}>
                 <Text style={styles.cardLabelOut}>표준어</Text>
-                <Text style={styles.cardTextOut}>{result.standard_text || '변환 결과가 없어요'}</Text>
+                <Text selectable style={styles.cardTextOut}>{result.standard_text || '변환 결과가 없어요'}</Text>
               </View>
               {typeof result.duration === 'number' && (
                 <Text style={styles.meta}>{result.duration.toFixed(1)}초</Text>
@@ -239,6 +250,15 @@ export default function App() {
           <Pressable
             onPress={onPressMic}
             disabled={disabled}
+            accessibilityRole="button"
+            accessibilityState={{ disabled, busy }}
+            accessibilityLabel={
+              recording ? '녹음 정지하고 표준어로 변환'
+                : busy ? '변환하는 중'
+                : loadingModels ? '모델을 준비하는 중'
+                : '녹음 시작'
+            }
+            accessibilityHint="사투리를 녹음하면 표준어로 바꿔줍니다"
             style={({ pressed }) => [
               styles.micButton,
               recording && styles.micButtonRecording,
@@ -276,6 +296,16 @@ export default function App() {
           )}
           {error && (
             <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>
+          )}
+          {canRetry && !loadingModels && (
+            <Pressable
+              onPress={prepare}
+              accessibilityRole="button"
+              accessibilityLabel="모델 준비 다시 시도"
+              style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.retryText}>다시 시도</Text>
+            </Pressable>
           )}
         </View>
 
@@ -387,6 +417,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
   },
   errorText: { fontSize: 14, color: CLAY, textAlign: 'center', fontWeight: '500' },
+  retryBtn: {
+    paddingHorizontal: 22, paddingVertical: 11, borderRadius: 999,
+    backgroundColor: TEAL_BRIGHT,
+  },
+  retryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   // 결과 카드(클린)
   results: { width: '100%', alignItems: 'center' },

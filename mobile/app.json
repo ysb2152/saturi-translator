@@ -37,7 +37,8 @@
           "backgroundColor": "#F5EDDD",
           "imageWidth": 200
         }
-      ]
+      ],
+      "./plugins/withCleanPermissions"
     ]
   }
 }

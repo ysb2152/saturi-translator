@@ -2,6 +2,13 @@
 
 실제 코드·설정(app.json, eas.json, AndroidManifest, build.gradle, App.js, 파이프라인/다운로드)을 직접 확인해 정리. `✅ 완료 / ⚠️ 조치 필요 / ❌ 미완/블로커`.
 
+## ✅ 코드 작업 1차 완료 (2026-09-04)
+- **권한 정리(B)**: config plugin [`plugins/withCleanPermissions.js`](../mobile/plugins/withCleanPermissions.js)로 `SYSTEM_ALERT_WINDOW`·`FOREGROUND_SERVICE(_MEDIA_PLAYBACK)`·미사용 `AudioControlsService`(expo-audio 재생 컨트롤, 앱 미사용) 제거. app.json 등록·모의 검증 완료. → **다음 prebuild/빌드 시 적용, 실기기에서 녹음 정상 재확인 필요.**
+- **다운로드 무결성/견고성(E1)**: 임시파일(.download)로 받고 **정확 바이트 크기 검증** 후에만 최종 이동 → 부분/손상 파일이 완결로 오인 안 됨. 실패 시 정리. **재시도 버튼** 추가(앱 재시작 불필요). Wi‑Fi 권장 안내 추가. (참고: 앱 재시작 간 진짜 byte-resume은 아직 미구현)
+- **녹음 파일 정리(E2)**: 처리 후 임시 WAV 삭제(누적 방지).
+- **접근성(E3)**: 마이크 버튼 accessibilityLabel/Role/State + 결과 텍스트 `selectable`(복사 가능).
+- 남은 코드 과제: 녹음 취소(E4), 셀룰러 하드 차단(expo-network 필요), 모델 버전 갱신(E5).
+
 ## A. 출시 블로커 (이게 안 되면 업로드 자체가 안 됨)
 
 | # | 항목 | 상태 | 내용 |
