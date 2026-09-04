@@ -38,8 +38,8 @@ AndroidManifest에 앱이 **쓰지 않는데 라이브러리(@siteed/expo-audio-
 | # | 항목 | 상태 | 내용 |
 |---|---|---|---|
 | C1 | 개인정보처리방침 문서 | ✅ | 온디바이스 기준 재작성 완료(`docs/privacy-policy.md`) |
-| C2 | 방침 **공개 URL 호스팅** | ❌ | GitHub Pages 등. Play는 공개 URL 필수 |
-| C3 | 방침 **연락처 이메일** | ❌ | 9항 placeholder. 공개될 메일 결정 필요 |
+| C2 | 방침 **공개 URL 호스팅** | ✅ | GitHub Pages 게시: **https://ysb2152.github.io/translate/privacy-policy.html** (main/docs, HTTP 200 확인) |
+| C3 | 방침 **연락처 이메일** | ✅ | ysb2152@gmail.com (개발자 이메일과 통일) |
 | C4 | **Data Safety 양식** | ❌ | Play Console 작성. 우리 앱=수집·공유 없음, RECORD_AUDIO는 온디바이스, INTERNET은 모델 다운로드. 방침과 일치해야 함 |
 | C5 | **콘텐츠 등급**(IARC 설문) | ❌ | 전연령 예상 |
 | C6 | 대상 연령·광고 없음 선언 | ❌ | 광고 없음, 만14세 미만 비대상 |

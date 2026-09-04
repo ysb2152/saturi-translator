@@ -58,6 +58,6 @@ Play Console에 그대로 붙여넣을 수 있는 스토어 리스팅 초안. �
 - 암호화: 다운로드는 HTTPS · 계정/로그인 없음
 
 ## 콘솔에서 직접 채울 것
-- 개인정보처리방침 URL (호스팅 후) — [docs/privacy-policy.md](privacy-policy.md)
+- 개인정보처리방침 URL: **https://ysb2152.github.io/translate/privacy-policy.html** ✅ 게시됨
 - 연락처 이메일(공개) · 개발자 이름(공개)
 - 콘텐츠 등급 IARC 설문 · 대상 연령
