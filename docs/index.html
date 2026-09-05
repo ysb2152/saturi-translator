@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>알아 묵나? — 사투리 → 표준어 음성 번역 (온디바이스)</title>
+<style>
+  :root { --ink:#2E251B; --sub:#6f6250; --teal:#215249; --teal2:#3FA095; --line:#e7dcc6; --bg:#F5EDDD; --card:#FFFDF8; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Malgun Gothic","맑은 고딕",system-ui,-apple-system,sans-serif; line-height:1.7; }
+  .wrap { max-width:760px; margin:0 auto; padding:44px 22px 72px; }
+  header { text-align:center; margin-bottom:28px; }
+  h1 { font-size:34px; margin:0 0 8px; letter-spacing:-0.5px; }
+  .tag { color:var(--sub); font-size:16px; margin:0; }
+  .demo { display:block; margin:26px auto; border-radius:18px; border:1px solid var(--line); max-width:300px; width:100%; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:26px 0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .card h3 { margin:0 0 4px; font-size:15px; color:var(--teal); }
+  .card p { margin:0; font-size:13.5px; color:var(--sub); }
+  .btns { text-align:center; margin:30px 0 8px; }
+  .btn { display:inline-block; margin:6px; padding:11px 20px; border-radius:999px; text-decoration:none; font-weight:700; font-size:14px; }
+  .btn.primary { background:var(--teal2); color:#fff; }
+  .btn.ghost { background:#fff; color:var(--teal); border:1px solid var(--teal2); }
+  footer { margin-top:36px; padding-top:18px; border-top:1px solid var(--line); color:var(--sub); font-size:12.5px; text-align:center; }
+  @media (max-width:520px){ .cards{grid-template-columns:1fr;} h1{font-size:28px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>알아 묵나?</h1>
+    <p class="tag">충청·강원·전라·경상 사투리를 표준어로 — 서버 없이 기기 안에서</p>
+  </header>
+
+  <img class="demo" src="screenshots/demo.gif" alt="데모 — 이거 억수로 맛있다 → 이거 대단히 맛있다">
+
+  <div class="cards">
+    <div class="card"><h3>온디바이스 · 오프라인</h3><p>음성 인식·번역을 휴대폰 안에서 처리. 첫 실행 1회 다운로드 후 인터넷 없이 동작.</p></div>
+    <div class="card"><h3>프라이버시</h3><p>녹음한 음성이 기기를 벗어나지 않음. 서버 전송·저장 없음, 계정 불필요.</p></div>
+    <div class="card"><h3>데이터로 개선</h3><p>표준 모델이 약한 사투리를 AI Hub 방언 데이터로 파인튜닝. STT CER 20.3%→11.7%.</p></div>
+    <div class="card"><h3>양자화 경량화</h3><p>Whisper q5 + KoBART int8로 1.2GB→490MB(−60%), 정확도 저하 없음.</p></div>
+  </div>
+
+  <div class="btns">
+    <a class="btn primary" href="https://github.com/ysb2152/saturi-translator">GitHub 저장소</a>
+    <a class="btn ghost" href="privacy-policy.html">개인정보처리방침</a>
+  </div>
+
+  <footer>데이터 출처: AI 허브(aihub.or.kr) 한국어 방언 음성 데이터로 학습한 모델을 사용합니다.</footer>
+</div>
+</body>
+</html>
