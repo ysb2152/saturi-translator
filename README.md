@@ -32,10 +32,7 @@
 
 ## 파이프라인 (전부 온디바이스)
 
-```
-음성 ──[① STT: Whisper q5]──▶ 사투리 텍스트 ──[② 변환: KoBART int8]──▶ 표준어 텍스트
-       (사투리 음성 인식)                        (사투리→표준어 재작성)
-```
+<p align="center"><img src="docs/architecture.svg" width="820" alt="온디바이스 아키텍처 — 학습·양자화→배포, 온디바이스 런타임"></p>
 
 - **① STT** — Whisper-small을 4지역 방언 음성으로 **LoRA 파인튜닝** → GGUF **q5_0** 양자화 → [whisper.rn](https://github.com/mybigday/whisper.rn)(whisper.cpp)로 기기에서 실행.
 - **② 변환** — `gogamza/kobart-base-v2`를 사투리→표준어 문장쌍으로 파인튜닝 → ExecuTorch **.pte(int8 weight-only)** export → [react-native-executorch](https://github.com/software-mansion/react-native-executorch)로 encoder 1회 + decoder greedy 루프 실행. 토크나이저·생성 루프를 앱에서 직접 구현.
