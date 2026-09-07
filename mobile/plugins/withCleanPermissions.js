@@ -3,26 +3,18 @@
 //
 // 제거 대상:
 //  - SYSTEM_ALERT_WINDOW : "다른 앱 위에 그리기" 민감권한. 미사용 → 제거(실기기 녹음 정상 검증됨, 2026-09-04).
-//  - FOREGROUND_SERVICE / FOREGROUND_SERVICE_MEDIA_PLAYBACK : expo-audio(재생용)에서 유입.
-//    이 앱은 오디오 재생을 하지 않으므로 미사용 → 제거(Android 14 전경서비스 유형 선언·Play 심사 마찰 제거).
-//  - net.siteed.audiostudio.AudioRecordingService : expo-audio-studio의 '배경 녹음'용 전경서비스.
-//    이 앱은 전경(화면 켠 상태) 녹음만 하고 배경 녹음(enableBackgroundAudio) 미사용 → 서비스 제거.
 //
-// ⚠️ 검증 필요: 위 FGS/서비스 제거 후에도 녹음(핵심 기능)이 정상인지 깨끗한 기기에서 확인할 것.
-//    (2026-09-04 무음은 기기 오디오 HAL 일시정지가 원인, 권한과 무관함이 재부팅으로 확인됨.)
-//    만약 녹음이 깨지면 FOREGROUND_SERVICE와 AudioRecordingService 제거만 되돌리고
-//    MEDIA_PLAYBACK 제거는 유지한다(그건 재생 전용이라 확실히 안전).
+// FGS 권한(FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK)과 AudioRecordingService는
+// 제거를 검토했으나, code 1이 이 권한들을 가진 채로 이미 Play 심사를 통과했고(= 블로커 아님),
+// 제거 시 녹음(핵심기능) 영향 재검증이 필요해 보수적으로 유지한다. 여유 기기에서 나란히 설치
+// 검증이 가능해질 때 다시 제거를 시도한다(그때는 MEDIA_PLAYBACK부터 — 재생 전용이라 안전).
 
 const { withAndroidManifest } = require('@expo/config-plugins');
 
 const RM_PERMS = [
   'android.permission.SYSTEM_ALERT_WINDOW',
-  'android.permission.FOREGROUND_SERVICE',
-  'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
 ];
-const RM_SERVICES = [
-  'net.siteed.audiostudio.AudioRecordingService',
-];
+const RM_SERVICES = [];
 
 module.exports = function withCleanPermissions(config) {
   return withAndroidManifest(config, (cfg) => {
