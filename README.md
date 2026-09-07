@@ -23,6 +23,8 @@
   - STT(Whisper) 사투리 인식 CER **20.3% → 11.7%** (4지역 LoRA, held-out val)
   - 변환(KoBART) copy 기준 대비 CER **5.79% → 1.63%** (4지역), 정확일치 26.5% → 77.7%
   - End-to-End(음성→표준어) 조용한 환경 CER **~8.5%**
+- **실사용 피드백으로 재개선(v2)** — 비공개 테스트에서 못 잡는 지역 어미·어휘를 **데이터 진단 → 합성 증강 재학습**으로 보강 (아래 절)
+  - held-out 어미 인식 CER **1.69% → 0.08%**, 어휘 정확일치 **80.8% → 90.8%** (일반 성능 회귀 미미: 1.63→1.74%)
 - **온디바이스** — 서버 비용 0, 오프라인 동작, 음성이 기기를 벗어나지 않음(프라이버시)
 - **양자화로 무손실 경량화** — 총 **1.2GB → 490MB**(−60%)인데 CER 저하 없음
   - STT q5_0: 487→175MB, 동일 val 120파일 f16 대비 **−0.35%p(오히려 우세)**
@@ -52,10 +54,31 @@ AI Hub 방언 라벨을 전처리해 **208만 문장쌍**을 확보했고, 이 �
 
 전체 분석 [data/analysis.md](data/analysis.md), 파인튜닝 근거 [why_finetune.md](why_finetune.md).
 
+## 실사용 피드백 루프 — 커버리지 진단 → 합성 증강 재학습 (v2)
+
+비공개 테스트에서 "**마 매끼나라**"(맡겨놔라), "**~심더**", "**~당께**" 같은 표현을 잘 못 잡는다는 피드백을 받았다. 원인을 추측하지 않고 **학습 데이터를 전수 진단**([training/ending_coverage.md](training/ending_coverage.md))한 결과 — AI Hub 방언 데이터는 지역 라벨이 붙어 있어도 **정작 지역 상징 어미가 거의 표준어에 가깝게** 발화돼 있었다:
+
+| 지역 대표 어미 | 학습쌍 등장 |
+|---|---|
+| 경상 임더·능교·니껴 | 0~1건 |
+| 전라 랑께·당께·부렀 | 0~1건 |
+| 강원 드래·드래요 | 6~7건 |
+
+**규칙 후처리(v1.0.2)**로 급한 케이스를 우선 막고, 근본 해결로 **합성 증강 재학습**을 했다. 실제 표준 문장에 지역 어미·어휘 치환을 적용해 `(합성 사투리, 표준어)` 쌍을 생성([data/augment_endings.py](data/augment_endings.py) 9.6만, [data/augment_lexical.py](data/augment_lexical.py) 5만) → balanced 70만에 섞어 KoBART 재학습(로컬 RTX 3080, 56분).
+
+| 검증(held-out from val) | 기존 모델 | 증강 모델 |
+|---|---|---|
+| 어미 변형 CER | 1.69% | **0.08%** |
+| 어미 변형 정확일치 | 75.2% | **98.0%** |
+| 어휘 변형 정확일치 | 80.8% | **90.8%** |
+
+일반 성능 회귀는 미미(1.63→1.74%), int8 `.pte` export 후 PyTorch 대비 **정합성 8/8**. 새 변환기는 `models-v2`로 호스팅하고, 앱의 **버전 매니페스트**가 변환기 `.pte`(314MB)만 증분 갱신한다(STT 유지). 검증 상세 [training/eval_aug.md](training/eval_aug.md).
+
 ## 기술 스택
 
 - **앱/런타임**: React Native (Expo SDK 57, New Architecture), whisper.rn(GGUF), react-native-executorch(ExecuTorch), @siteed/expo-audio-studio, 첫 실행 모델 다운로드(GitHub Releases 호스팅)
-- **학습**: HuggingFace `transformers` + `peft`(LoRA), Colab GPU
+- **학습**: HuggingFace `transformers` + `peft`(LoRA), Colab GPU(초기) · 로컬 RTX 3080(증강 재학습)
+- **데이터 증강**: 커버리지 진단 기반 어미·어휘 합성 치환(규칙) → 문장쌍 생성
 - **양자화/변환**: whisper.cpp(q5 GGUF), ExecuTorch export(torchao int8 weight-only)
 - **개발용 백엔드**: FastAPI — 학습 중 서빙·평가에 사용(런타임 서버 아님)
 - **데이터**: AI Hub 「한국어 방언 발화」(충청·강원·전라·경상)
@@ -96,6 +119,8 @@ npx expo run:android      # 개발 빌드. 첫 실행 시 모델(~490MB) 다운�
 - [x] **온디바이스 통합** — whisper.rn + ExecuTorch, 실기기 E2E 동작(7~8초)
 - [x] **양자화** — 1.2GB→490MB, CER 저하 없음(정량 검증)
 - [x] **아이덴티티·배포 준비** — 앱 이름·아이콘, 개인정보방침 호스팅, 스토어 자산, 서명 AAB
-- [ ] 플레이스토어 비공개 테스트 → 출시
+- [x] **플레이스토어 비공개 테스트 게시** — 테스터 12명·14일 진행 중
+- [x] **실사용 피드백 반영** — 후처리 안전망·짧은발화 안정화·다운로드 견고화 + **합성 증강 재학습(변환기 v2)**
+- [ ] 14일 비공개 테스트 완료 → 프로덕션 출시
 
 진행 상세 [DEVELOPMENT_JOURNEY.md](DEVELOPMENT_JOURNEY.md).
