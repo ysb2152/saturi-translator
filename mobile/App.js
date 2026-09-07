@@ -18,8 +18,10 @@ import { useAudioRecorder as usePcmRecorder } from '@siteed/expo-audio-studio';
 import { documentDirectory, deleteAsync } from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 
+import * as Network from 'expo-network';
+
 import { loadPipeline, runPipeline } from './src/ondevicePipeline';
-import { ensureModels } from './src/modelDownload';
+import { ensureModels, needsDownload } from './src/modelDownload';
 
 // 온디바이스 모델 경로 = 앱 내부 files 디렉터리(네이티브 fopen 항상 가능; scoped storage 무관).
 // 테스트: adb push→외부→run-as로 내부 복사. 배포: 첫 실행 다운로드→documentDirectory.
@@ -68,6 +70,7 @@ export default function App() {
   const [loadingModels, setLoadingModels] = useState(false);
   const [downloadPct, setDownloadPct] = useState(null); // 0..1, 다운로드 중일 때만
   const [canRetry, setCanRetry] = useState(false);      // 준비 실패 시 재시도 노출
+  const [needCellularConsent, setNeedCellularConsent] = useState(false); // 셀룰러에서 다운로드 동의 대기
 
   const recording = pcm.isRecording;
 
@@ -122,9 +125,11 @@ export default function App() {
   }, [result, appear]);
 
   // 권한 확인 + 모델 다운로드/로드 (실패 시 재시도 가능)
-  const prepare = useCallback(async () => {
+  // allowCellular=true면 셀룰러에서도 다운로드 진행(사용자가 "데이터로 계속" 누른 경우)
+  const prepare = useCallback(async (allowCellular = false) => {
     setError(null);
     setCanRetry(false);
+    setNeedCellularConsent(false);
     const { granted } = await requestRecordingPermissionsAsync();
     setPermissionGranted(granted);
     if (!granted) {
@@ -133,6 +138,19 @@ export default function App() {
       return;
     }
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+
+    // 첫 실행 다운로드가 필요한데 셀룰러면, 데이터 사용 동의를 먼저 받는다(490MB).
+    try {
+      if (!allowCellular && (await needsDownload())) {
+        const net = await Network.getNetworkStateAsync();
+        if (net && net.type === Network.NetworkStateType.CELLULAR) {
+          setStatus('모델 다운로드는 약 490MB예요.\n데이터 요금이 나올 수 있어 Wi‑Fi를 권장해요.');
+          setNeedCellularConsent(true);
+          return; // 사용자가 "데이터로 계속" 또는 Wi‑Fi 연결 후 재시도
+        }
+      }
+    } catch (_) { /* 네트워크 판단 실패 시 그냥 진행 */ }
+
     setLoadingModels(true);
     try {
       // 첫 실행: 모델(~490MB) 다운로드. 이미 있으면 즉시 통과.
@@ -343,9 +361,29 @@ export default function App() {
           {error && (
             <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>
           )}
+          {needCellularConsent && (
+            <View style={styles.consentRow}>
+              <Pressable
+                onPress={() => prepare(true)}
+                accessibilityRole="button"
+                accessibilityLabel="모바일 데이터로 모델 다운로드 계속"
+                style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.retryText}>데이터로 계속</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => prepare()}
+                accessibilityRole="button"
+                accessibilityLabel="Wi‑Fi 연결 후 다시 시도"
+                style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.linkText}>Wi‑Fi 연결 후 다시 시도</Text>
+              </Pressable>
+            </View>
+          )}
           {canRetry && !loadingModels && (
             <Pressable
-              onPress={prepare}
+              onPress={() => prepare()}
               accessibilityRole="button"
               accessibilityLabel="모델 준비 다시 시도"
               style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
@@ -468,6 +506,8 @@ const styles = StyleSheet.create({
     backgroundColor: TEAL_BRIGHT,
   },
   retryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  consentRow: { alignItems: 'center', gap: 10 },
+  linkText: { color: SUB, fontSize: 13.5, fontWeight: '600', textDecorationLine: 'underline' },
   cancelBtn: {
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999,
     borderWidth: 1, borderColor: CLAY, backgroundColor: '#FFFFFFCC',

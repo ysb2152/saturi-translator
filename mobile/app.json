@@ -2,7 +2,7 @@
   "expo": {
     "name": "알아 묵나?",
     "slug": "saturi-translator",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.ysb2152.saturitranslator",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#CBB078",
         "foregroundImage": "./assets/android-icon-foreground.png",
