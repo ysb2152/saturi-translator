@@ -17,20 +17,29 @@ import {
   writeAsStringAsync,
 } from 'expo-file-system/legacy';
 
-// 모델 세트 버전. 모델을 새로 올리면 이 값과 아래 태그를 함께 올린다(→ 앱이 자동 갱신).
-export const MODELS_VERSION = 'models-v1';
-export const MODELS_BASE_URL =
-  `https://github.com/ysb2152/saturi-translator/releases/download/${MODELS_VERSION}`;
+// 모델 세트 버전 마커. 변환기(.pte)를 새로 올릴 때마다 올린다(→ 앱이 자동 갱신).
+// 주의: 재학습해도 int8 .pte는 '바이트 크기가 동일'하고 내용만 다르다. 따라서 크기 검증만으론
+//       업데이트를 감지할 수 없어, 이 마커가 바뀌면 volatile(변환기) 파일을 강제 재다운로드한다.
+export const MODELS_VERSION = 'v2';
 
+const RELEASE_BASE = 'https://github.com/ysb2152/saturi-translator/releases/download';
 const VERSION_FILE = 'models.version';
 
-// name = 저장/로드 파일명, bytes = 릴리스 에셋의 정확한 바이트 크기(무결성 검증용)
+// name=저장/로드 파일명, bytes=정확한 바이트(무결성), tag=호스팅 릴리스, volatile=모델 변경 시 갱신 대상.
+// STT·토크나이저는 안 바뀌므로 models-v1 그대로 재사용(재업로드 불필요). 변환기 .pte만 models-v2.
 const FILES = [
-  { name: 'ggml-model-q5_0.bin', bytes: 175209680 },
-  { name: 'encoder.pte', bytes: 138325016 },
-  { name: 'decoder.pte', bytes: 176043048 },
-  { name: 'tokenizer.json', bytes: 1513021 },
+  { name: 'ggml-model-q5_0.bin', bytes: 175209680, tag: 'models-v1' },
+  { name: 'tokenizer.json', bytes: 1513021, tag: 'models-v1' },
+  { name: 'encoder.pte', bytes: 138325016, tag: 'models-v2', volatile: true },
+  { name: 'decoder.pte', bytes: 176043048, tag: 'models-v2', volatile: true },
 ];
+
+function fileUrl(f) {
+  return `${RELEASE_BASE}/${f.tag}/${f.name}`;
+}
+
+// 하위호환: 이전 코드/문서가 참조하던 이름
+export const MODELS_BASE_URL = `${RELEASE_BASE}/models-v2`;
 
 const RESUME_SAVE_EVERY = 8 * 1024 * 1024; // 이어받기 상태 저장 간격(~8MB)
 
@@ -64,9 +73,12 @@ async function writeText(uri, text) {
   try { await writeAsStringAsync(uri, text); } catch (_) {}
 }
 
-// 이전 모델 세트 전부 정리(버전 변경 시 디스크 확보 + 깨끗한 재다운로드)
-async function cleanupAll() {
+// 버전 변경 시 변환기(volatile) 파일만 강제 삭제 → 재다운로드 유도.
+// int8 .pte는 재학습해도 바이트 크기가 같아 크기 검증만으론 갱신을 못 잡으므로 강제 삭제가 필요.
+// STT·토크나이저(stable)는 건드리지 않아 업데이트 시 .pte(~314MB)만 다시 받는다.
+async function forceRedownloadVolatile() {
   for (const f of FILES) {
+    if (!f.volatile) continue;
     await rm(`${documentDirectory}${f.name}`);
     await rm(`${documentDirectory}${f.name}.download`);
     await rm(`${documentDirectory}${f.name}.resume`);
@@ -96,7 +108,7 @@ async function downloadOne(f, partUri, finalUri, resumeUri, onTick) {
   let res;
   if (savedState && savedState.resumeData && (await sizeOf(partUri)) > 0) {
     dl = createDownloadResumable(
-      savedState.url || `${MODELS_BASE_URL}/${f.name}`,
+      savedState.url || fileUrl(f),
       partUri,
       savedState.options || {},
       cb,
@@ -108,12 +120,12 @@ async function downloadOne(f, partUri, finalUri, resumeUri, onTick) {
       // 이어받기 실패 → 처음부터 새로 받기
       await rm(partUri);
       await rm(resumeUri);
-      dl = createDownloadResumable(`${MODELS_BASE_URL}/${f.name}`, partUri, {}, cb);
+      dl = createDownloadResumable(fileUrl(f), partUri, {}, cb);
       res = await dl.downloadAsync();
     }
   } else {
     await rm(partUri); // 이어받을 근거 없으면 부분파일 정리 후 새로
-    dl = createDownloadResumable(`${MODELS_BASE_URL}/${f.name}`, partUri, {}, cb);
+    dl = createDownloadResumable(fileUrl(f), partUri, {}, cb);
     res = await dl.downloadAsync();
   }
 
@@ -140,7 +152,7 @@ async function downloadOne(f, partUri, finalUri, resumeUri, onTick) {
 /** 다운로드가 필요한지 미리 확인(네트워크 사용 없음). 셀룰러 경고 게이트 판단용. */
 export async function needsDownload() {
   const stored = await readText(`${documentDirectory}${VERSION_FILE}`);
-  if (stored != null && stored !== MODELS_VERSION) return true; // 버전 변경 → 재다운로드
+  if (stored !== MODELS_VERSION) return true; // 버전 불일치(마커 없음=구버전 사용자 포함) → 재다운로드 필요
   for (const f of FILES) {
     if (!(await isComplete(f.name, f.bytes))) return true;
   }
@@ -152,15 +164,10 @@ export async function ensureModels(onProgress) {
   const versionUri = `${documentDirectory}${VERSION_FILE}`;
   const storedVersion = await readText(versionUri);
 
-  if (storedVersion == null) {
-    // 마커 없음: 기존 사용자(구버전 앱에서 이미 받음)일 수 있음.
-    // 파일이 이미 전부 완결이면 현재 버전으로 인정하고 재다운로드하지 않는다.
-    let all = true;
-    for (const f of FILES) { if (!(await isComplete(f.name, f.bytes))) { all = false; break; } }
-    if (all) { await writeText(versionUri, MODELS_VERSION); return false; }
-  } else if (storedVersion !== MODELS_VERSION) {
-    // 명시적 버전 변경: 이전 모델 정리 후 전부 재다운로드
-    await cleanupAll();
+  // 마커가 현재 버전과 다르면(마커 없음=구버전 사용자 포함) 변환기(volatile)만 강제 재다운로드.
+  // STT·토크나이저는 크기 검증으로 완결이면 유지 → 업데이트는 .pte(~314MB)만 받는다.
+  if (storedVersion !== MODELS_VERSION) {
+    await forceRedownloadVolatile();
   }
 
   const missing = [];
