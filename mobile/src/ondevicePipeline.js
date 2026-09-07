@@ -4,6 +4,7 @@
 import { initWhisper } from 'whisper.rn';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { loadConverter, convertOnDevice } from './ondeviceConverter';
+import { applyDialectPostfix } from './dialectPostfix';
 
 let whisperCtx = null;
 let ready = false;
@@ -37,6 +38,8 @@ export async function runPipeline(audioPath) {
   const { promise } = whisperCtx.transcribe(`data:audio/wav;base64,${b64}`, { language: 'ko', maxThreads: 4 });
   const stt = await promise;
   const dialect = (stt && stt.result ? stt.result : '').trim();
-  const { text: standard } = await convertOnDevice(dialect);
+  const { text: converted } = await convertOnDevice(dialect);
+  // 하이브리드 후처리: 변환기가 놓친 잔여 사투리 표현을 규칙으로 보정(학습 데이터 커버리지 공백 대응)
+  const standard = applyDialectPostfix(converted);
   return { dialect, standard, ms: Date.now() - t0 };
 }
