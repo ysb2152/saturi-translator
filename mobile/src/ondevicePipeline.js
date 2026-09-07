@@ -35,7 +35,13 @@ export async function runPipeline(audioPath) {
   // fileUri가 file:/... 또는 file:///... 또는 raw 경로로 올 수 있어 정규화(이중 접두 방지)
   const raw = audioPath.replace(/^file:\/+/, '/');       // → /data/.../xxx.wav
   const b64 = await readAsStringAsync(`file://${raw}`, { encoding: 'base64' });
-  const { promise } = whisperCtx.transcribe(`data:audio/wav;base64,${b64}`, { language: 'ko', maxThreads: 4 });
+  const { promise } = whisperCtx.transcribe(`data:audio/wav;base64,${b64}`, {
+    language: 'ko',
+    maxThreads: 4,
+    beamSize: 3,     // 빔서치: 짧고 애매한 발화의 오인식·환각을 greedy보다 안정적으로 줄임
+    temperature: 0,  // 결정적 디코딩 — 무음 패딩에서 오는 환각 억제
+    prompt: '다음은 한국어 사투리 대화입니다.', // 도메인 프라이밍(한국어 사투리 쪽으로 유도)
+  });
   const stt = await promise;
   const dialect = (stt && stt.result ? stt.result : '').trim();
   const { text: converted } = await convertOnDevice(dialect);

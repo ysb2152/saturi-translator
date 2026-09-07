@@ -47,6 +47,7 @@ const LINE = '#EBE0CC';        // 크림 위 헤어라인
 const haptic = (style) => { try { Haptics.impactAsync(style); } catch (_) {} };
 
 const MAX_REC_MS = 20000; // 녹음 최대 20초(런어웨이·과도한 처리 방지)
+const MIN_REC_MS = 700;   // 이보다 짧으면 Whisper 환각 위험 → 변환 않고 다시 요청
 
 // 임시 녹음 WAV 삭제(file:/ 경로 정규화 후)
 const deleteWav = async (uri) => {
@@ -181,7 +182,10 @@ export default function App() {
     try {
       const rec = await pcm.stopRecording();
       uri = rec && rec.fileUri;
+      const durMs = rec && typeof rec.durationMs === 'number' ? rec.durationMs : null;
       if (!uri) { setError('녹음 파일을 찾지 못했어요.'); setStatus('버튼을 누르고 사투리로 말해보세요'); return; }
+      // 너무 짧은 녹음은 인식이 불안정(환각) → 변환하지 않고 다시 요청. finally가 임시파일 정리.
+      if (durMs != null && durMs < MIN_REC_MS) { setStatus('너무 짧아요 — 한 문장으로 또박또박 말해주세요'); return; }
       if (!modelsReady) { setError('온디바이스 모델이 아직 준비되지 않았어요.'); return; }
       setBusy(true);
       setStatus('기기에서 표준어로 옮기는 중이에요');
@@ -268,6 +272,10 @@ export default function App() {
             <View style={styles.results}>
               <Animated.View style={[styles.skel, shimmerStyle]} />
               <Animated.View style={[styles.skelOut, shimmerStyle]} />
+            </View>
+          ) : modelsReady && !recording ? (
+            <View style={styles.tipCard}>
+              <Text style={styles.tipText}>단어 하나보다{'\n'}<Text style={styles.tipStrong}>짧은 문장으로 또박또박</Text> 말하면{'\n'}더 정확해요</Text>
             </View>
           ) : null}
         </View>
@@ -490,6 +498,14 @@ const styles = StyleSheet.create({
   cardTextIn: { fontFamily: 'serif', fontSize: 19, color: INK, lineHeight: 27 },
   cardTextOut: { fontFamily: 'serif', fontSize: 21, color: TEAL_INK, lineHeight: 30, fontWeight: '700' },
   meta: { fontSize: 12, color: '#B0A48C', textAlign: 'center', marginTop: 12 },
+
+  // 대기 중 사용 팁
+  tipCard: {
+    paddingHorizontal: 20, paddingVertical: 16, borderRadius: 16,
+    backgroundColor: '#FFFFFF80', borderWidth: 1, borderColor: LINE,
+  },
+  tipText: { fontSize: 14.5, color: SUB, textAlign: 'center', lineHeight: 23 },
+  tipStrong: { color: TEAL_INK, fontWeight: '700' },
 
   // 변환 중 스켈레톤
   skel: {
