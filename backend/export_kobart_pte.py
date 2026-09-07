@@ -15,9 +15,10 @@ USE_XNNPACK = os.getenv("XNN", "0") == "1"
 if USE_XNNPACK:
     from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
 
-MODEL = "backend/models/kobart-dialect"
-OUT = "backend/models/kobart-pte"
+MODEL = os.getenv("MODEL", "backend/models/kobart-dialect")
+OUT = os.getenv("OUT", "backend/models/kobart-pte")
 os.makedirs(OUT, exist_ok=True)
+print(f"MODEL={MODEL}  OUT={OUT}")
 
 tok = AutoTokenizer.from_pretrained(MODEL)
 model = BartForConditionalGeneration.from_pretrained(MODEL).eval()
