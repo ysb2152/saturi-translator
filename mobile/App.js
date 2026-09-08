@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -20,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 
 import * as Network from 'expo-network';
 
-import { loadPipeline, runPipeline } from './src/ondevicePipeline';
+import { loadPipeline, runPipeline, convertText } from './src/ondevicePipeline';
 import { ensureModels, needsDownload } from './src/modelDownload';
 
 // 온디바이스 모델 경로 = 앱 내부 files 디렉터리(네이티브 fopen 항상 가능; scoped storage 무관).
@@ -71,6 +72,8 @@ export default function App() {
   const [downloadPct, setDownloadPct] = useState(null); // 0..1, 다운로드 중일 때만
   const [canRetry, setCanRetry] = useState(false);      // 준비 실패 시 재시도 노출
   const [needCellularConsent, setNeedCellularConsent] = useState(false); // 셀룰러에서 다운로드 동의 대기
+  const [mode, setMode] = useState('voice'); // 'voice' | 'text'
+  const [textInput, setTextInput] = useState('');
 
   const recording = pcm.isRecording;
 
@@ -236,6 +239,38 @@ export default function App() {
     else startRecording();
   };
 
+  // 텍스트 모드: 입력한 사투리 텍스트 → 표준어 (STT 없이 변환기만, 가장 정확)
+  const convertTextInput = async () => {
+    const text = textInput.trim();
+    if (busy || loadingModels) return;
+    if (!text) { setError('사투리 문장을 입력해 주세요.'); return; }
+    if (!modelsReady) { setError('온디바이스 모델이 아직 준비되지 않았어요.'); return; }
+    setError(null);
+    haptic(Haptics.ImpactFeedbackStyle.Light);
+    setBusy(true);
+    setStatus('기기에서 표준어로 옮기는 중이에요');
+    try {
+      const { standard, ms } = await convertText(text);
+      setResult({ dialect_text: text, standard_text: standard, duration: ms / 1000, from: 'text' });
+      setStatus('다른 문장도 입력해 보세요');
+    } catch (e) {
+      setError(`변환에 실패했어요: ${e.message}`);
+      setStatus('문제가 생겼어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 모드 전환: 진행 중이면 무시, 아니면 결과·입력·에러 정리
+  const switchMode = (next) => {
+    if (recording || busy || mode === next) return;
+    setMode(next);
+    setResult(null);
+    setError(null);
+    if (next === 'voice') setStatus(modelsReady ? '버튼을 누르고 사투리로 말해보세요' : status);
+    else setStatus(modelsReady ? '사투리 문장을 입력하고 변환을 눌러보세요' : status);
+  };
+
   // 언마운트 시 타이머 정리
   useEffect(() => clearRecTimer, []);
 
@@ -267,14 +302,30 @@ export default function App() {
           <Text style={styles.badgeText}>충청·강원·전라·경상</Text>
         </View>
         <Text style={styles.title}>사투리 번역</Text>
-        <Text style={styles.subtitle}>사투리로 말하면{'\n'}표준어로 바꿔드려요</Text>
+        <Text style={styles.subtitle}>사투리를 표준어로 바꿔드려요</Text>
+
+        {/* ── 모드 토글: 음성 / 텍스트 ── */}
+        <View style={styles.modeToggle}>
+          {[['voice', '🎤  음성'], ['text', '⌨️  텍스트']].map(([m, label]) => (
+            <Pressable
+              key={m}
+              onPress={() => switchMode(m)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: mode === m }}
+              accessibilityLabel={m === 'voice' ? '음성 모드' : '텍스트 모드'}
+              style={({ pressed }) => [styles.modeBtn, mode === m && styles.modeBtnActive, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={[styles.modeText, mode === m && styles.modeTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
 
         {/* ── 중간(성장): 결과 / 스켈레톤 / 빈 공간 ── */}
         <View style={styles.middle}>
           {result ? (
             <Animated.View style={[styles.results, appearStyle]}>
               <View style={styles.cardIn}>
-                <Text style={styles.cardLabel}>인식된 사투리</Text>
+                <Text style={styles.cardLabel}>{result.from === 'text' ? '입력한 사투리' : '인식된 사투리'}</Text>
                 <Text selectable style={styles.cardTextIn}>{result.dialect_text || '음성을 알아듣지 못했어요'}</Text>
               </View>
               <View style={styles.arrow}><View style={styles.arrowDown} /></View>
@@ -293,12 +344,17 @@ export default function App() {
             </View>
           ) : modelsReady && !recording ? (
             <View style={styles.tipCard}>
-              <Text style={styles.tipText}>단어 하나보다{'\n'}<Text style={styles.tipStrong}>짧은 문장으로 또박또박</Text> 말하면{'\n'}더 정확해요</Text>
+              {mode === 'voice' ? (
+                <Text style={styles.tipText}>단어 하나보다{'\n'}<Text style={styles.tipStrong}>짧은 문장으로 또박또박</Text> 말하면{'\n'}더 정확해요</Text>
+              ) : (
+                <Text style={styles.tipText}>사투리 문장을 입력하면{'\n'}<Text style={styles.tipStrong}>표준어로 바꿔드려요</Text>{'\n'}음성 인식 오류 없이 가장 정확해요</Text>
+              )}
             </View>
           ) : null}
         </View>
 
-        {/* ── 마이크 ── */}
+        {/* ── 입력 영역: 음성(마이크) 또는 텍스트 ── */}
+        {mode === 'voice' ? (
         <View style={styles.micWrap}>
           {recording && <Animated.View style={[styles.ring, ringStyle]} />}
           <Pressable
@@ -333,6 +389,33 @@ export default function App() {
             )}
           </Pressable>
         </View>
+        ) : (
+        <View style={styles.textArea}>
+          <TextInput
+            style={styles.textField}
+            value={textInput}
+            onChangeText={setTextInput}
+            placeholder="사투리 문장을 입력하세요 (예: 밥 뭇나)"
+            placeholderTextColor="#B7A98F"
+            multiline
+            editable={!busy && !loadingModels}
+            accessibilityLabel="사투리 텍스트 입력"
+          />
+          <Pressable
+            onPress={convertTextInput}
+            disabled={busy || loadingModels || !textInput.trim()}
+            accessibilityRole="button"
+            accessibilityLabel="표준어로 변환"
+            style={({ pressed }) => [
+              styles.convertBtn,
+              (busy || loadingModels || !textInput.trim()) && styles.convertBtnDisabled,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.convertText}>표준어로 변환</Text>}
+          </Pressable>
+        </View>
+        )}
 
         {/* ── 정중앙 문구(마이크 ↔ 출처 사이 동일 간격) ── */}
         <View style={styles.between}>
@@ -455,6 +538,32 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 12, fontSize: 15.5, color: SUB, textAlign: 'center', lineHeight: 23,
   },
+
+  // 모드 토글(음성/텍스트)
+  modeToggle: {
+    flexDirection: 'row', marginTop: 16, backgroundColor: '#FFFFFFB0',
+    borderRadius: 999, borderWidth: 1, borderColor: LINE, padding: 4, gap: 4,
+  },
+  modeBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
+  modeBtnActive: { backgroundColor: TEAL_BRIGHT },
+  modeText: { fontSize: 14, fontWeight: '700', color: SUB },
+  modeTextActive: { color: '#fff' },
+
+  // 텍스트 입력 영역
+  textArea: { width: '100%', alignItems: 'center', gap: 14, paddingHorizontal: 4 },
+  textField: {
+    width: '100%', minHeight: 96, maxHeight: 160, backgroundColor: SURFACE,
+    borderRadius: 18, borderWidth: 1, borderColor: LINE, padding: 16,
+    fontSize: 18, color: INK, lineHeight: 26, textAlignVertical: 'top', fontFamily: 'serif',
+  },
+  convertBtn: {
+    paddingHorizontal: 30, paddingVertical: 14, borderRadius: 999,
+    backgroundColor: TEAL_BRIGHT, minWidth: 160, alignItems: 'center',
+    shadowColor: TEAL_BRIGHT, shadowOpacity: 0.35, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 }, elevation: 6,
+  },
+  convertBtnDisabled: { backgroundColor: '#AFC7C2', shadowOpacity: 0.12 },
+  convertText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   // 중간 성장 영역(결과/스켈레톤)
   middle: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },

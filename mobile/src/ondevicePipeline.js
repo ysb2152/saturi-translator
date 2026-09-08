@@ -49,3 +49,15 @@ export async function runPipeline(audioPath) {
   const standard = applyDialectPostfix(converted);
   return { dialect, standard, ms: Date.now() - t0 };
 }
+
+/**
+ * 텍스트 전용: 사투리 텍스트 → 표준어. STT 없이 변환기+후처리만 사용(가장 정확한 경로).
+ * @param {string} dialectText 사투리 텍스트
+ */
+export async function convertText(dialectText) {
+  if (!ready) throw new Error('pipeline not loaded');
+  const t0 = Date.now();
+  const { text: converted } = await convertOnDevice(dialectText);
+  const standard = applyDialectPostfix(converted);
+  return { standard, ms: Date.now() - t0 };
+}
