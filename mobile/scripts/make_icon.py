@@ -1,5 +1,5 @@
-"""앱 아이콘 생성 — 연갈색 배경 + 궁서체 '알' + 청록 스파크.
-궁서체는 Windows batang.ttc(궁서 포함). Pillow로 여러 에셋 크기를 뽑는다.
+"""앱 아이콘을 만든다 — 연갈색 배경에 궁서체 '알' 글자, 청록 스파크.
+궁서체는 Windows batang.ttc에 들어 있는 걸 쓴다. Pillow로 여러 에셋 크기를 뽑아낸다.
 실행: backend/.venv/Scripts/python.exe mobile/scripts/make_icon.py
 """
 import os, sys

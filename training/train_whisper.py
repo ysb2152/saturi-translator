@@ -1,8 +1,8 @@
-"""사투리 음성 → 사투리 텍스트 (Whisper) 로컬 GPU 파인튜닝.
+"""Whisper를 로컬 GPU에서 파인튜닝해 사투리 음성을 사투리 텍스트로 옮긴다.
 
-표준 Whisper가 사투리 발음에서 약한 것을 방언 음성으로 파인튜닝해 개선한다.
-입력: data/preprocess_streaming.py(또는 preprocess.py)가 만든 STT 매니페스트
-      data/processed/stt/{train,val}.jsonl  ({audio_filepath, text, duration})
+표준 Whisper가 사투리 발음에 약해서, 방언 음성으로 파인튜닝해 끌어올린다.
+입력은 preprocess_streaming.py(또는 preprocess.py)가 만든 STT 매니페스트
+      data/processed/stt/{train,val}.jsonl  ({audio_filepath, text, duration}).
 
   training/.venv/Scripts/python.exe training/train_whisper.py \
       --data data/processed/stt --model openai/whisper-base --epochs 2
@@ -76,7 +76,7 @@ def _noise_files():
 
 
 def _real_noise(n, rng):
-    """MUSAN에서 랜덤 소음 조각을 길이 n 으로 반환(없으면 None → 가우시안 폴백)."""
+    """MUSAN에서 랜덤 소음 조각을 길이 n만큼 잘라 반환한다(없으면 None, 호출부가 가우시안으로 폴백)."""
     import numpy as np, soundfile as sf, librosa
     files = _noise_files()
     if not files:
@@ -101,7 +101,7 @@ def _real_noise(n, rng):
 
 
 def _reverb(arr, rng):
-    """합성 잔향(exponential-decay RIR convolution). 실측 RIR 없이 잔향 강건성 부여."""
+    """합성 잔향을 입힌다(exponential-decay RIR convolution). 실측 RIR이 없어도 잔향에 강해지게 하려는 것."""
     import numpy as np
     rt60 = rng.uniform(0.1, 0.6)
     n = max(8, int(rt60 * SR))
@@ -224,7 +224,7 @@ def main():
         return arr
 
     if args.augment:
-        # 증강 모드: 특징은 콜레이터가 배치마다 계산 → map은 라벨만(경로 유지, 캐시 최소)
+        # 증강 모드에선 특징을 콜레이터가 배치마다 계산하니, map에선 라벨만 만든다(경로는 남기고 캐시는 최소로)
         def prep(b):
             b["labels"] = processor.tokenizer(b["text"]).input_ids
             return b
@@ -327,7 +327,7 @@ def main():
         adir = out / "adapter_lora"
         model.save_pretrained(str(adir))  # 어댑터만(수 MB) — 로드맵(온디바이스/지역별) 재사용
         print(f"LoRA 어댑터 저장: {adir}")
-        model = model.merge_and_unload()  # 서빙용 병합 → 백엔드는 일반 모델로 로드(변경 불필요)
+        model = model.merge_and_unload()  # 서빙할 땐 병합해서 백엔드가 그냥 일반 모델로 로드하게 한다(백엔드 수정 불필요)
         model.save_pretrained(str(out))
     else:
         trainer.save_model(str(out))
@@ -336,7 +336,7 @@ def main():
 
     print("\n=== 파인튜닝 후 ===")
     ft_cer, refs, preds = eval_cer(model, "파인튜닝")
-    print(f"\n★ CER  표준 {base_cer:.4f} → 파인튜닝 {ft_cer:.4f}  "
+    print(f"\nCER  표준 {base_cer:.4f} → 파인튜닝 {ft_cer:.4f}  "
           f"({(base_cer - ft_cer) / base_cer * 100:.0f}% 개선)" if base_cer else "")
     print("--- 예시 (정답 / 예측) ---")
     for r, p in list(zip(refs, preds))[:6]:

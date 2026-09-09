@@ -1,5 +1,5 @@
-"""MUSAN tar에서 noise 서브셋만 추출(music/speech 제외). 추출 후 개수 출력.
-tar 삭제는 이 스크립트가 하지 않음 — 개수 확인 후 별도로 삭제할 것."""
+"""MUSAN tar에서 noise 서브셋만 뽑는다(music/speech는 제외). 뽑고 나서 개수를 출력한다.
+tar는 여기서 안 지우니, 개수 확인하고 따로 지울 것."""
 import tarfile, os, sys
 
 TAR = "data/musan.tar.gz"

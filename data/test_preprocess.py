@@ -79,4 +79,4 @@ if __name__ == "__main__":
     test_clean_text()
     test_extract()
     test_end_to_end()
-    print("전체 통과 ✅")
+    print("전체 통과")

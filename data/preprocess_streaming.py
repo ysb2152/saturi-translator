@@ -1,11 +1,11 @@
-"""STT용 스트리밍 전처리 — 큰 오디오 zip을 통째로 풀지 않고 처리.
+"""STT용 스트리밍 전처리 — 큰 오디오 zip을 통째로 풀지 않고 처리한다.
 
-AI Hub 원천(음성) zip은 하나가 17~28GB라, 압축을 다 풀면(중복 용량) 로컬 34GB에 안 들어간다.
-그래서 zip 안에서 WAV를 **하나씩** 꺼내(temp) → 라벨의 발화 구간으로 잘라 작은 클립 저장 →
-temp WAV 삭제, 를 반복한다. 피크 디스크 = (zip 크기) + (temp WAV 1개) + (누적 클립).
---max-clips 로 개수를 제한하면 포트폴리오용 소량만 뽑아 무료 드라이브에 올릴 수 있다.
+AI Hub 음성 zip은 하나가 17~28GB라 다 풀면(중복 용량까지) 로컬 34GB에 안 들어간다.
+그래서 zip 안에서 WAV를 하나씩만 temp로 꺼내 라벨의 발화 구간대로 자른 뒤 작은 클립으로 저장하고,
+temp WAV는 바로 지운다. 이렇게 하면 피크 디스크가 (zip 크기) + (temp WAV 1개) + (누적 클립) 정도로 유지된다.
+--max-clips로 개수를 제한하면 포트폴리오용으로 소량만 뽑아 무료 드라이브에 올릴 수도 있다.
 
-라벨(전사 JSON)은 먼저 따로 받아 풀어둔 경로(--labels)를 쓴다(작아서 부담 없음).
+라벨(전사 JSON)은 작아서 부담이 없으니 미리 따로 받아 풀어둔 경로(--labels)를 쓴다.
 
   python data/preprocess_streaming.py \
       --zip "(비식별화완료)경상도_1.zip" \
@@ -32,9 +32,9 @@ AUDIO_SUFFIXES = (".wav", ".WAV")
 
 
 class _ConcatParts(io.RawIOBase):
-    """AI Hub가 tar 안에 `xxx.zip.part<offset>` 로 1GB씩 쪼개 담은 zip을,
-    재구성(디스크 복사) 없이 하나의 seekable 스트림처럼 제공한다. 실제 바이트는
-    tar 파일에서 직접 읽어, zipfile이 그대로 멤버를 추출할 수 있게 한다."""
+    """AI Hub가 tar 안에 xxx.zip.part<offset> 로 1GB씩 쪼개 담은 zip을 다룬다.
+    디스크에 이어붙여 복원하지 않고, 하나의 seekable 스트림인 척 흉내낸다.
+    실제 바이트는 tar에서 바로 읽어와서, zipfile이 그대로 멤버를 뽑아갈 수 있게 한다."""
 
     def __init__(self, tar_path: str):
         self._f = open(tar_path, "rb")
@@ -101,7 +101,7 @@ def build_label_index(labels_root: Path) -> dict[str, Path]:
 
 
 def split_of(stem: str, val_ratio: float) -> str:
-    """세션 stem 해시로 결정적 train/val 분할(청크를 나눠 돌려도 일관)."""
+    """세션 stem을 해시해서 train/val을 결정적으로 나눈다(청크로 쪼개 돌려도 항상 같은 쪽)."""
     h = int(md5(stem.encode("utf-8")).hexdigest(), 16) % 10000
     return "val" if h < val_ratio * 10000 else "train"
 

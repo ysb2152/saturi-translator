@@ -1,7 +1,7 @@
-"""양자화(int8) 정확도 영향 빠른 검증 — fp32 vs torch 동적 int8 CER 비교.
+"""양자화(int8)가 정확도에 얼마나 영향을 주는지 빠르게 본다 — fp32 vs torch 동적 int8 CER 비교.
 
-whisper.cpp GGUF(q5/q8)가 실제 온디바이스 경로지만 C 빌드 필요 → 여기선 torch
-dynamic int8 로 근사(보통 GGUF q5가 더 좋음, 즉 보수적 신호). 크기도 함께 추정.
+실제 온디바이스 경로는 whisper.cpp GGUF(q5/q8)지만 C 빌드가 필요해서, 여기선 torch dynamic int8로 근사한다
+(보통 GGUF q5가 더 좋으니 이건 보수적인 신호). 크기도 같이 추정한다.
 """
 from __future__ import annotations
 import argparse, json, sys, time

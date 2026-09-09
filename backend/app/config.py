@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 # STT 모델 크기: tiny / base / small / medium / large-v3
-# 뼈대 단계에서는 CPU에서 빠른 base로 시작. 파인튜닝 후에는 학습된 모델 경로로 교체.
+# 초반엔 CPU에서 빠른 base로 시작했고, 파인튜닝 후엔 학습된 모델 경로로 바꿔 쓴다.
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 
 # 파인튜닝된 STT 모델을 CTranslate2로 변환해 둔 디렉터리 경로(있으면 WHISPER_MODEL 대신 사용).

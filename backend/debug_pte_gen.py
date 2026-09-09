@@ -1,4 +1,4 @@
-"""빈 출력 디버깅: .pte(encoder/decoder)로 greedy 생성을 Python에서 재현하고 PyTorch와 비교.
+"""출력이 빈 문제를 디버깅하려고, .pte(encoder/decoder)로 greedy 생성을 Python에서 재현해 PyTorch와 비교한다.
 실행: C:/et/Scripts/python.exe backend/debug_pte_gen.py
 """
 import sys

@@ -1,7 +1,7 @@
-"""플레이스토어 리스팅 자산 생성.
-- icon-512.png            : 하이레스 아이콘(512)
+"""플레이스토어 리스팅에 올릴 자산을 만든다.
+- icon-512.png            : 고해상도 아이콘(512)
 - feature-graphic.png     : 피처 그래픽 1024x500
-- store-screenshot-*.png  : E2E 스크린샷을 2:1로 정리(Play 비율 요건)
+- store-screenshot-*.png  : E2E 스크린샷을 2:1로 맞춰 정리(Play 비율 요건)
 실행: backend/.venv/Scripts/python.exe mobile/scripts/make_store_assets.py <out_dir>
 """
 import os, sys, glob

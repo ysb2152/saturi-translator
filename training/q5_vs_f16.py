@@ -1,5 +1,5 @@
-"""실제 온디바이스 STT 모델 양자화 검증: f16 GGUF vs q5_0 GGUF, 같은 파일로 CER 비교.
-whisper-cli.exe(공식 프리빌트)로 두 모델을 각각 돌려 지역별/전체 CER과 델타를 낸다.
+"""온디바이스 STT 양자화를 실제로 검증한다: 같은 val 파일에 f16 GGUF와 q5_0 GGUF를 둘 다 돌려 CER 비교.
+공식 프리빌트 whisper-cli.exe로 두 모델을 각각 돌려서 지역별·전체 CER과 그 차이를 낸다.
 """
 import json, subprocess, sys, os, random
 from pathlib import Path

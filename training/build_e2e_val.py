@@ -1,7 +1,7 @@
-"""기존 STT val 클립에 표준어 정답을 붙여 E2E 평가용 매니페스트 생성.
+"""기존 STT val 클립에 표준어 정답을 붙여서 E2E 평가용 매니페스트를 만든다.
 
-라벨(Downloads/download*.tar)에서 stem별 발화 리스트를 읽어, 클립 파일명
-{stem}_{index}.wav 의 index 발화의 standard_form 을 정답으로 매칭한다.
+라벨(Downloads/download*.tar)에서 stem별 발화 리스트를 읽고, 클립 파일명
+{stem}_{index}.wav의 index번째 발화의 standard_form을 정답으로 매칭한다.
 출력: data/processed_*/stt/val_e2e.jsonl  ({audio_filepath, dialect, standard})
 """
 from __future__ import annotations

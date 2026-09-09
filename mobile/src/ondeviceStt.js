@@ -1,8 +1,6 @@
-// 온디바이스 STT (whisper.rn) — 서버 없이 기기에서 사투리 음성을 인식한다.
-// whisper.rn 0.7.4 API: initWhisper({filePath}) → ctx.transcribe(path) → { promise }
-//
-// 모델(ggml)은 용량이 커 앱에 번들하지 않고 기기 파일시스템 경로로 로드한다.
-// 첫 실행 시 다운로드해 파일 경로를 넘기는 방식(계획서 §4)과 호환.
+// whisper.rn으로 사투리 음성을 기기에서 바로 인식한다(서버 없음).
+// 0.7.4 API는 initWhisper({filePath}) → ctx.transcribe(path) → { promise } 형태.
+// ggml 모델은 용량이 커서 앱에 넣지 않고, 첫 실행 때 받아둔 파일 경로로 로드한다.
 
 import { initWhisper } from 'whisper.rn';
 

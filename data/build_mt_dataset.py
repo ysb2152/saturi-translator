@@ -1,11 +1,9 @@
-"""변환(사투리→표준어) 학습셋 구성.
+"""사투리→표준어 변환 학습셋을 만든다.
 
-preprocess.py 가 만든 mt/{train,val}.jsonl 은 중복이 많고 동일쌍(방언=표준)이 ~84%다.
-그대로 학습하면 모델이 '그대로 베끼기'만 배우기 쉬우므로:
-  1) 완전 중복(같은 (방언,표준)) 제거
-  2) 동일쌍을 목표 비율까지 다운샘플링(변형 학습에 집중)
-  3) 길이 필터 + 셔플 + (선택) 상한
-해서 mt_balanced/{train,val}.jsonl 로 저장한다.
+preprocess.py가 뽑은 mt/{train,val}.jsonl은 중복이 많고 동일쌍(방언=표준)이 ~84%나 된다.
+이걸 그대로 학습하면 모델이 '그대로 베끼기'만 배우기 쉬워서, 완전 중복을 지우고,
+동일쌍을 목표 비율까지 줄이고(변형 학습에 집중), 길이 필터·셔플·상한을 걸어서
+mt_balanced/{train,val}.jsonl로 저장한다.
 
   python data/build_mt_dataset.py --in-dir data/processed/mt --out-dir data/processed/mt_balanced
 """
@@ -47,7 +45,7 @@ def build(records, identity_ratio: float, min_len: int, max_len: int,
         seen.add(key)
         (ident if d == s else diff).append({"dialect": d, "standard": s})
 
-    # 동일쌍 개수 = 변형쌍 * ratio/(1-ratio)  → 최종 동일쌍 비율이 identity_ratio가 됨
+    # 변형쌍 * ratio/(1-ratio) 만큼 동일쌍을 남기면 최종 동일쌍 비율이 딱 identity_ratio가 된다
     if identity_ratio <= 0:
         keep_ident = []
     elif identity_ratio >= 1:

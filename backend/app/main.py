@@ -1,7 +1,7 @@
-"""FastAPI 서버: 사투리 음성을 받아 표준어 텍스트로 변환.
+"""사투리 음성을 받아 표준어 텍스트로 돌려주는 FastAPI 서버.
 
-실행:  uvicorn app.main:app --reload   (backend/ 디렉터리에서)
-문서:  http://127.0.0.1:8000/docs
+실행: backend/에서 uvicorn app.main:app --reload
+문서: http://127.0.0.1:8000/docs
 """
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
-"""KoBART(변환기)를 ExecuTorch .pte로 export — react-native-executorch 온디바이스용.
-1단계: encoder를 .pte로. (decoder/with-past는 후속)
+"""KoBART 변환기를 ExecuTorch .pte로 뽑는다(react-native-executorch 온디바이스용).
+encoder / decoder를 각각 .pte로 export한다.
 실행: C:/et/Scripts/python.exe backend/export_kobart_pte.py
 """
 import os, sys
@@ -30,7 +30,7 @@ class Encoder(torch.nn.Module):
         self.enc = m.get_encoder()
 
     def forward(self, input_ids, attention_mask):
-        # int32 입력을 받아 내부에서 long으로(JS에서 Int32Array 사용 → BigInt64Array 회피)
+        # int32로 받아 내부에서 long으로 캐스팅(JS에서 Int32Array 쓰려는 것 — BigInt64Array 피하려고)
         return self.enc(input_ids=input_ids.long(), attention_mask=attention_mask.long()).last_hidden_state
 
 
@@ -66,9 +66,9 @@ def lower(ep):
 
 
 def _quantize(module, example, dynamic_shapes):
-    """torchao weight-only int8 — Linear 가중치만 int8(activation·입력 불변).
-    PT2E(XNNPACKQuantizer)는 정수 임베딩 입력까지 양자화하려다 실패해서, weight-only로 우회.
-    portable로 export되며 flatc/XNNPACK 불필요. 임베딩(fp32)은 유지."""
+    """torchao weight-only int8. Linear 가중치만 int8로 바꾸고 activation·입력은 그대로 둔다.
+    처음엔 PT2E(XNNPACKQuantizer)를 썼는데 정수 임베딩 입력까지 양자화하려다 실패해서 weight-only로 돌아섰다.
+    이러면 portable로 export돼서 flatc/XNNPACK도 필요 없다. 임베딩은 fp32 유지."""
     from torchao.quantization import quantize_, Int8WeightOnlyConfig
     quantize_(module, Int8WeightOnlyConfig())
     return module
@@ -94,9 +94,9 @@ eseq = Dim("eseq", min=2, max=512)
 print("[encoder] export ...")
 mb = save_pte(export_and_lower(enc, (ii, am),
               ({0: STATIC, 1: eseq}, {0: STATIC, 1: eseq})), os.path.join(OUT, "encoder.pte"))
-print(f"✅ encoder.pte {mb:.1f} MB")
+print(f"encoder.pte {mb:.1f} MB")
 
-# ── decoder (단일 스텝) ── 인코더가 in-place 양자화됐으니 fp32 모델을 새로 로드
+# ── decoder (단일 스텝) ── 앞에서 quantize_가 인코더를 in-place로 바꿔놔서 fp32 모델을 새로 로드한다
 model2 = BartForConditionalGeneration.from_pretrained(MODEL).eval()
 with torch.no_grad():
     enc_hidden = model2.get_encoder()(input_ids=ii.long(), attention_mask=am.long()).last_hidden_state
@@ -108,5 +108,5 @@ print("[decoder] export ...")
 mb = save_pte(export_and_lower(dec, (dec_ids, enc_hidden, am),
               ({0: STATIC, 1: dseq}, {0: STATIC, 1: eseq2, 2: STATIC}, {0: STATIC, 1: eseq2})),
               os.path.join(OUT, "decoder.pte"))
-print(f"✅ decoder.pte {mb:.1f} MB")
+print(f"decoder.pte {mb:.1f} MB")
 print("완료: encoder.pte + decoder.pte")

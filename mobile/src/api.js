@@ -1,9 +1,7 @@
-// 백엔드(FastAPI) 호출 모듈.
-//
-// 녹음된 로컬 파일(file:// URI)을 서버로 업로드해 사투리→표준어 변환 결과를 받는다.
-// Expo SDK 57에서는 전역 fetch + { uri, name, type } FormData 파트가 지원되지 않으므로
-// (에러: "unsupported FormDataPart implementation"), expo-file-system의 File.upload를 사용.
-// expo-file-system은 Expo Go에 기본 내장되어 별도 빌드 없이 동작한다.
+// 백엔드(FastAPI)를 호출하는 모듈. 녹음한 로컬 파일(file:// URI)을 서버에 올려서 변환 결과를 받는다.
+// 처음엔 전역 fetch + { uri, name, type } FormData로 올리려 했는데 Expo SDK 57에서
+// "unsupported FormDataPart implementation" 에러가 나서, expo-file-system의 File.upload로 바꿨다.
+// expo-file-system은 Expo Go에 이미 들어 있어서 따로 빌드할 필요가 없다.
 import { File, UploadType } from 'expo-file-system';
 
 // 서버 주소 기본값:

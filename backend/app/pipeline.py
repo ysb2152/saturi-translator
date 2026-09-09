@@ -1,7 +1,7 @@
-"""사투리 음성 → 표준어 텍스트 파이프라인.
+"""사투리 음성을 표준어 텍스트로 바꾸는 파이프라인.
 
-1단계 STT:  사투리 음성 → 사투리 텍스트   (faster-whisper)
-2단계 변환: 사투리 텍스트 → 표준어 텍스트  (지금은 규칙기반 스텁, 이후 KoBART로 교체)
+STT로 음성을 사투리 텍스트로 옮기고(faster-whisper), 그걸 다시 표준어로 변환한다.
+변환은 처음엔 규칙 스텁이었다가 나중에 KoBART로 갈아끼웠다.
 """
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ class TranslationResult:
 
 
 class Transcriber:
-    """STT 래퍼. config.WHISPER_FT_DIR 이 있으면 파인튜닝 Whisper(transformers)로,
-    없으면 faster-whisper로 인식. 모델은 첫 사용 시 지연 로딩."""
+    """STT 래퍼. WHISPER_FT_DIR이 잡혀 있으면 파인튜닝한 Whisper(transformers)를 쓰고,
+    없으면 faster-whisper로 돌린다. 모델은 처음 쓸 때 로딩한다(지연 로딩)."""
 
     def __init__(self) -> None:
         self._model = None
@@ -51,7 +51,7 @@ class Transcriber:
         feats = self._proc(arr, sampling_rate=16000, return_tensors="pt").input_features
         feats = feats.to(config.WHISPER_DEVICE)
         with torch.no_grad():
-            # beam search로 CER ~0.7%p 개선(greedy 대비). 온디바이스는 지연↑라 beam 축소 고려.
+            # greedy 대신 beam search를 쓰면 CER이 ~0.7%p 좋아진다. 온디바이스는 느려지니 beam을 줄이는 걸 고려.
             gen = self._ft.generate(feats, max_new_tokens=128, num_beams=5,
                                     no_repeat_ngram_size=3)  # 반복 환각 억제
         text = self._proc.batch_decode(gen, skip_special_tokens=True)[0].strip()

@@ -1,11 +1,11 @@
-"""변환 문장쌍(mt/*.jsonl) 탐색적 분석(EDA).
+"""변환 문장쌍(mt/*.jsonl)을 훑어보는 탐색적 분석(EDA).
 
-'표준 모델이 못하는 영역을 데이터로 개선한다'는 서사를 숫자로 뒷받침하기 위해:
+'표준 모델이 약한 부분을 데이터로 메운다'는 얘기를 숫자로 받쳐주려고:
   - 동일/변형 쌍 비율
   - 문장 길이 분포
   - 가장 흔한 사투리 어절 → 표준 어절 치환(Top-N)
   - 사투리 종결어미 패턴
-을 집계해 콘솔 + data/analysis.md 로 남긴다. GPU 불필요, CPU 수 초.
+을 집계해서 콘솔이랑 data/analysis.md에 남긴다. GPU 없이 CPU로 몇 초.
 
   python data/analyze.py --in-dir data/processed/mt --out data/analysis.md
 """

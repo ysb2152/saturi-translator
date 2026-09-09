@@ -1,11 +1,11 @@
-// 온디바이스 변환기(KoBART, ExecuTorch) — 사투리 텍스트 → 표준어.
-// react-native-executorch: TokenizerModule(tokenizer.json) + ExecutorchModule(encoder/decoder .pte)
-// encoder 1회 → decoder 자기회귀(단일스텝, KV캐시 없음) greedy 루프.
+// KoBART 변환기를 기기에서 돌려 사투리 텍스트를 표준어로 바꾼다(ExecuTorch).
+// react-native-executorch가 주는 건 TokenizerModule(tokenizer.json)과 ExecutorchModule(encoder/decoder .pte)뿐이라,
+// encoder를 한 번 돌리고 decoder를 EOS까지 반복 호출하는 greedy 생성 루프는 여기서 직접 짠다(KV캐시는 안 씀).
 
 import { ExecutorchModule, TokenizerModule, initExecutorch } from 'react-native-executorch';
-// NOTE: react-native-executorch-expo-resource-fetcher 0.9.1은 metro가 node_modules에서
-// 내부 파일(lib/ResourceFetcher.js)을 resolve하지 못한다(package.json exports 캡슐화 + Windows metro 크롤 이슈).
-// 회피: 어댑터 컴파일본(lib/*.js)을 src/etfetcher로 vendoring해 import한다.
+// react-native-executorch-expo-resource-fetcher 0.9.1을 그냥 쓰면 metro가 내부 파일(lib/ResourceFetcher.js)을
+// 못 찾는다(package.json exports가 막아둔 데다 Windows metro 크롤 이슈까지 겹침).
+// 그래서 그 어댑터 컴파일본(lib/*.js)을 src/etfetcher로 복사해서 import한다.
 import { ExpoResourceFetcher } from './etfetcher';
 
 let _initialized = false;

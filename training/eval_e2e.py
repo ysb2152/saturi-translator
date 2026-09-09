@@ -1,6 +1,6 @@
-"""End-to-end 파이프라인 평가: 음성 → STT → 변환(KoBART) → 표준어, 최종 표준어 CER.
+"""파이프라인 전체(음성 → STT → KoBART 변환 → 표준어)를 끝까지 돌려 최종 표준어 CER을 잰다.
 
-표준어 정답은 STT val의 사투리 텍스트를 MT({dialect,standard}) 데이터로 역참조해 복구한다.
+표준어 정답은 STT val의 사투리 텍스트를 MT({dialect,standard}) 데이터에서 역참조해 되살린다.
 
   training/.venv/Scripts/python.exe training/eval_e2e.py --n 300
 """

@@ -63,4 +63,4 @@ def test_streaming_end_to_end():
 if __name__ == "__main__":
     print("스트리밍 전처리 테스트 시작")
     test_streaming_end_to_end()
-    print("통과 ✅")
+    print("통과")

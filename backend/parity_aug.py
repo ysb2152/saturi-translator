@@ -1,6 +1,6 @@
-"""증강 .pte 정합성 — 실제 encoder/decoder.pte(int8) greedy vs PyTorch, 증강 케이스 유지 확인.
-실행: MODEL=... PTE=... C:/et/Scripts/python.exe backend/parity_aug.py
-결과는 backend/parity_aug.md 로 저장."""
+"""증강으로 보강한 케이스가 .pte에서도 유지되는지 확인한다.
+실제 encoder/decoder.pte(int8)로 greedy 생성한 결과를 PyTorch와 대조한다.
+실행: MODEL=... PTE=... C:/et/Scripts/python.exe backend/parity_aug.py — 결과는 backend/parity_aug.md에 저장."""
 import os, sys
 try: sys.stdout.reconfigure(encoding="utf-8")
 except Exception: pass
@@ -60,7 +60,7 @@ for t in TESTS:
     a, b = pt_greedy(t), pte_greedy(t)
     ok = a.strip() == b.strip()
     match += ok
-    out.append(f"| {t} | {a} | {b} | {'✓' if ok else '✗'} |")
+    out.append(f"| {t} | {a} | {b} | {'O' if ok else 'X'} |")
 out.append("")
 out.append(f"**일치: {match}/{len(TESTS)}**")
 open("backend/parity_aug.md", "w", encoding="utf-8").write("\n".join(out) + "\n")

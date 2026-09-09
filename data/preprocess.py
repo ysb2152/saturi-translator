@@ -1,8 +1,8 @@
-"""AI Hub 방언 발화 raw 데이터 → 학습용 산출물 전처리.
+"""AI Hub 방언 raw 데이터를 학습용 산출물로 전처리한다.
 
-산출물 2종:
+두 가지를 뽑는다:
   1) STT 매니페스트 (Whisper 파인튜닝용):  {"audio_filepath","text","duration"}
-     - text = 방언(사투리) 전사. 표준 Whisper 대비 개선을 측정할 핵심 데이터.
+     - text = 방언(사투리) 전사. 표준 Whisper 대비 개선을 잴 핵심 데이터.
   2) 변환 문장쌍 (KoBART/T5용):            {"dialect","standard"}
 
 입력 가정:

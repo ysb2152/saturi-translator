@@ -1,7 +1,7 @@
-"""AI Hub 방언 라벨 구조를 흉내 낸 합성 샘플 생성(전처리 파이프라인 검증용).
+"""AI Hub 방언 라벨 구조를 흉내 낸 합성 샘플을 만든다(전처리 파이프라인 검증용).
 
-실제 데이터가 없어도 preprocess.py 가 도는지 확인하기 위한 것이다.
-data/sample_raw/{audio,labels} 에 세션 WAV + 라벨 JSON 을 만든다.
+실제 데이터가 없어도 preprocess.py가 도는지 확인하려는 것이다.
+data/sample_raw/{audio,labels}에 세션 WAV랑 라벨 JSON을 만든다.
 """
 from __future__ import annotations
 

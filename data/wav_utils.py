@@ -1,7 +1,7 @@
-"""표준 라이브러리(wave)만으로 PCM WAV를 다루는 최소 유틸.
+"""표준 라이브러리 wave만으로 PCM WAV를 다루는 최소 유틸.
 
-AI Hub 방언 오디오는 대체로 PCM WAV(16kHz mono)라 wave 모듈로 충분하다.
-다른 포맷(mp3/flac 등)이면 slice가 불가하므로 원본을 그대로 참조하고 duration만 비운다.
+AI Hub 방언 오디오는 대체로 16kHz mono PCM WAV라 wave 모듈로 충분하다.
+mp3/flac 같은 다른 포맷이면 자르기가 안 되니 원본을 그대로 참조하고 duration만 비운다.
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""STT 디코딩 비교: greedy vs beam search (지역별 CER). 재학습 없이 디코딩만 변경."""
+"""재학습 없이 디코딩만 바꿔서 greedy vs beam search를 지역별 CER로 비교한다."""
 from __future__ import annotations
 import argparse, json, sys
 from pathlib import Path

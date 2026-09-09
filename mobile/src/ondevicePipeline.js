@@ -1,5 +1,5 @@
-// 온디바이스 파이프라인: 음성 → (whisper.rn STT) 사투리 → (executorch 변환) 표준어.
-// 서버 없이 기기에서 전체 수행. 모델 파일은 앱 파일시스템 경로로 로드.
+// 기기 안에서 음성 → 사투리(whisper.rn STT) → 표준어(executorch 변환)를 한 번에 돌린다.
+// 서버를 안 거치고, 모델 파일은 기기 파일시스템 경로로 로드한다.
 
 import { initWhisper } from 'whisper.rn';
 import { readAsStringAsync } from 'expo-file-system/legacy';
@@ -31,8 +31,8 @@ export function isPipelineReady() {
 export async function runPipeline(audioPath) {
   if (!ready) throw new Error('pipeline not loaded');
   const t0 = Date.now();
-  // whisper.rn의 파일경로 WAV 로딩이 실패해, base64 data URI 경로로 전달(다른 처리 경로)
-  // fileUri가 file:/... 또는 file:///... 또는 raw 경로로 올 수 있어 정규화(이중 접두 방지)
+  // whisper.rn이 파일경로 WAV를 제대로 못 읽어서, base64 data URI로 넘긴다(내부의 다른 경로를 타게 됨).
+  // fileUri가 file:/..., file:///..., raw 경로로 제각각 와서 접두사를 정규화한다(이중 접두 방지).
   const raw = audioPath.replace(/^file:\/+/, '/');       // → /data/.../xxx.wav
   const b64 = await readAsStringAsync(`file://${raw}`, { encoding: 'base64' });
   const { promise } = whisperCtx.transcribe(`data:audio/wav;base64,${b64}`, {

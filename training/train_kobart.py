@@ -1,7 +1,7 @@
-"""사투리→표준어 변환(KoBART) 로컬 GPU 파인튜닝.
+"""KoBART 사투리→표준어 변환기를 로컬 GPU에서 파인튜닝한다.
 
-Colab 없이 로컬 GPU(예: RTX 3080)에서 학습한다. Colab 노트북과 동일한 로직
-(EOS 라벨 부착 + 반복 억제 생성). 학습 후 CER 평가 + 모델 저장.
+Colab 안 쓰고 로컬 GPU(RTX 3080)에서 돌린다. 로직은 Colab 노트북이랑 같다
+(라벨에 EOS 붙이고, 생성 때 반복 억제). 학습이 끝나면 CER을 재고 모델을 저장한다.
 
   training/.venv/Scripts/python.exe training/train_kobart.py \
       --data data/processed/mt_balanced --out backend/models/kobart-dialect --epochs 2
@@ -64,7 +64,7 @@ def main():
         x = tok(batch["dialect"], max_length=MAXLEN, truncation=True)
         labels = tok(text_target=batch["standard"], max_length=MAXLEN - 1,
                      truncation=True)["input_ids"]
-        # KoBART 토크나이저는 EOS를 자동으로 안 붙임 → 디코더가 '멈춤'을 배우도록 추가
+        # KoBART 토크나이저는 EOS를 자동으로 안 붙여준다. 직접 붙여야 디코더가 '여기서 멈춰'를 배운다
         x["labels"] = [ids + [eos] for ids in labels]
         return x
 

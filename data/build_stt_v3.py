@@ -1,10 +1,10 @@
-"""STT v3 학습셋 병합 — 확대한 경상(processed_gs_big) + 기존 3지역(각 2500)을 합쳐
-train_whisper.py 가 읽는 dir(data/processed_stt_v3/stt)로 만든다.
+"""STT v3 학습셋을 병합한다. 확대한 경상(processed_gs_big)에 기존 3지역(각 2500)을 합쳐서
+train_whisper.py가 읽는 폴더(data/processed_stt_v3/stt)로 만든다.
 
   training/.venv/Scripts/python.exe data/build_stt_v3.py
 
-val 은 확대 경상의 held-out 세션(= 새 화자/표현) 위주 + 기존 지역 val 일부.
-audio_filepath 는 리포지토리 루트 기준 상대경로라, 루트에서 학습하면 그대로 로드된다."""
+val은 확대 경상의 held-out 세션(새 화자·표현) 위주에 기존 지역 val을 조금 섞었다.
+audio_filepath는 리포 루트 기준 상대경로라, 루트에서 학습하면 그대로 로드된다."""
 import json, os, random, sys
 try: sys.stdout.reconfigure(encoding="utf-8")
 except Exception: pass

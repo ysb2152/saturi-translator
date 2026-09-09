@@ -1,11 +1,10 @@
-// 첫 실행 모델 다운로드 — APK엔 코드만, 모델(~490MB)은 앱이 받아 documentDirectory에 저장.
-//
-// 견고성:
-//  - 임시파일(.download)로 받고 → 정확 바이트 크기 검증 → 통과 시에만 최종 경로로 이동.
-//  - 이어받기: 진행 중 savable() 상태를 .resume(JSON)에 저장하고, 다음 실행에서 그게 있으면
-//    resumeAsync()로 이어받는다(앱이 중간에 죽어도 처음부터 다시 받지 않음). 이어받기 실패 시 새로 받기로 폴백.
-//  - 버전 매니페스트: models.version 마커로 현재 모델 세트를 식별. MODELS_VERSION을 올리면(models-v2 등)
-//    이전 모델을 정리하고 재다운로드한다. 마커가 없고 파일이 이미 완결이면 기존 사용자로 보고 재다운로드하지 않는다.
+// APK엔 코드만 넣고, 모델(~490MB)은 첫 실행 때 받아서 documentDirectory에 저장한다.
+// 받다가 앱이 죽어도 처음부터 다시 안 받는 게 중요해서 이렇게 짰다:
+// .download 임시파일로 받고, 바이트 크기가 정확히 맞을 때만 최종 경로로 옮긴다.
+// 진행 상태(savable())는 주기적으로 .resume에 저장해두고, 다음 실행에 그게 있으면 resumeAsync로 이어받는다.
+// 이어받기가 실패하면 그냥 새로 받는다.
+// 모델 세트는 models.version 마커로 구분한다. MODELS_VERSION을 올리면 옛 모델을 지우고 다시 받고,
+// 마커가 없는데 파일이 이미 다 있으면 기존 사용자로 보고 재다운로드하지 않는다.
 
 import {
   documentDirectory,
@@ -17,9 +16,9 @@ import {
   writeAsStringAsync,
 } from 'expo-file-system/legacy';
 
-// 모델 세트 버전 마커. 변환기(.pte)를 새로 올릴 때마다 올린다(→ 앱이 자동 갱신).
-// 주의: 재학습해도 int8 .pte는 '바이트 크기가 동일'하고 내용만 다르다. 따라서 크기 검증만으론
-//       업데이트를 감지할 수 없어, 이 마커가 바뀌면 volatile(변환기) 파일을 강제 재다운로드한다.
+// 모델 세트 버전 마커. 변환기(.pte)를 새로 올릴 때마다 하나 올린다(그래야 앱이 자동으로 갱신).
+// 재학습해도 int8 .pte는 바이트 크기가 똑같고 내용만 달라서, 크기 검증만으론 업데이트를 못 잡는다.
+// 그래서 이 마커가 바뀌면 변환기(volatile) 파일을 강제로 다시 받는다.
 export const MODELS_VERSION = 'v2';
 
 const RELEASE_BASE = 'https://github.com/ysb2152/saturi-translator/releases/download';
@@ -73,9 +72,9 @@ async function writeText(uri, text) {
   try { await writeAsStringAsync(uri, text); } catch (_) {}
 }
 
-// 버전 변경 시 변환기(volatile) 파일만 강제 삭제 → 재다운로드 유도.
-// int8 .pte는 재학습해도 바이트 크기가 같아 크기 검증만으론 갱신을 못 잡으므로 강제 삭제가 필요.
-// STT·토크나이저(stable)는 건드리지 않아 업데이트 시 .pte(~314MB)만 다시 받는다.
+// 버전이 바뀌면 변환기(volatile) 파일만 지워서 다시 받게 한다.
+// (int8 .pte는 크기가 그대로라 크기 검증으로는 못 잡으니 지워버리는 수밖에 없다.)
+// STT·토크나이저는 안 건드리니까 업데이트할 땐 .pte(~314MB)만 다시 받는다.
 async function forceRedownloadVolatile() {
   for (const f of FILES) {
     if (!f.volatile) continue;

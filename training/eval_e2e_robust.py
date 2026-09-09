@@ -1,6 +1,6 @@
-"""실환경 E2E: 소음 입힌 음성 → STT(beam) → 변환(KoBART) → 표준어 CER.
+"""소음 입힌 음성을 STT(beam) → KoBART 변환까지 끝까지 돌려 표준어 CER을 재는 실환경 E2E.
 
-조건: clean, phone+SNR10(실제 폰+생활소음). val_e2e.jsonl(표준 정답) 사용.
+조건은 clean과 phone+SNR10(실제 폰+생활소음). 표준 정답은 val_e2e.jsonl을 쓴다.
 """
 from __future__ import annotations
 import argparse, json, sys

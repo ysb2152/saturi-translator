@@ -1,4 +1,4 @@
-"""변환기(KoBART) 양자화 정확도 검증 — fp32 vs torch 동적 int8, MT val 사투리→표준어 CER."""
+"""변환기(KoBART) 양자화가 정확도에 주는 영향을 본다 — fp32 vs torch 동적 int8, MT val에서 사투리→표준어 CER."""
 from __future__ import annotations
 import argparse, json, sys
 from pathlib import Path

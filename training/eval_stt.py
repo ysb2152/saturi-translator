@@ -1,4 +1,4 @@
-"""학습된 STT 모델을 지역별 held-out val로 평가(진짜 CER).
+"""학습한 STT 모델을 지역별 held-out val로 평가한다(실제 CER).
 
   training/.venv/Scripts/python.exe training/eval_stt.py --model backend/models/whisper-dialect-lora --n 400
   (--baseline 로 표준 whisper-small 도 함께 측정)
@@ -82,7 +82,7 @@ def main():
             exact = sum(1 for r, q in zip(refs, preds) if r.strip() == q.strip())
             print(f"   └ 정확일치 {exact}/{len(refs)} ({exact/len(refs)*100:.0f}%)")
             for r, q in list(zip(refs, preds))[:args.examples]:
-                mark = "✓" if r.strip() == q.strip() else "≈"
+                mark = "=" if r.strip() == q.strip() else "~"
                 print(f"     {mark} 정답: {r}")
                 print(f"       예측: {q}")
     # 가중 평균

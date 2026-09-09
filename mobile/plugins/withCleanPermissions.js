@@ -1,13 +1,13 @@
-// CNG(android/ 자동생성)에서 매니페스트를 정리하는 config plugin.
-// 라이브러리가 끌어온, 이 앱이 쓰지 않는 민감 권한을 제거해 Play 심사 마찰을 줄인다.
+// android/를 자동생성(CNG)할 때 매니페스트를 손보는 config plugin.
+// 라이브러리가 딸려 넣는데 정작 앱은 안 쓰는 민감 권한을 빼서 Play 심사 마찰을 줄인다.
 //
-// 제거 대상:
-//  - SYSTEM_ALERT_WINDOW : "다른 앱 위에 그리기" 민감권한. 미사용 → 제거(실기기 녹음 정상 검증됨, 2026-09-04).
+// SYSTEM_ALERT_WINDOW("다른 앱 위에 그리기")는 안 쓰는데 붙어 있어서 제거한다.
+// (2026-09-04에 실기기에서 녹음 정상 동작까지 확인함.)
 //
-// FGS 권한(FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK)과 AudioRecordingService는
-// 제거를 검토했으나, code 1이 이 권한들을 가진 채로 이미 Play 심사를 통과했고(= 블로커 아님),
-// 제거 시 녹음(핵심기능) 영향 재검증이 필요해 보수적으로 유지한다. 여유 기기에서 나란히 설치
-// 검증이 가능해질 때 다시 제거를 시도한다(그때는 MEDIA_PLAYBACK부터 — 재생 전용이라 안전).
+// FGS 권한(FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK)이랑 AudioRecordingService도
+// 뺄까 했는데, code 1이 이걸 가진 채로 이미 심사를 통과했고(블로커 아님) 빼면 녹음 영향 재검증이
+// 필요해서 일단 그대로 둔다. 여분 기기로 나란히 깔아 비교할 수 있게 되면 그때 다시 뺀다
+// (재생 전용이라 안전한 MEDIA_PLAYBACK부터).
 
 const { withAndroidManifest } = require('@expo/config-plugins');
 

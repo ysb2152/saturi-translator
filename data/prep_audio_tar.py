@@ -1,14 +1,14 @@
-"""AI Hub 음성 .tar(안에 .zip.partN) → zip 복원 → 스트리밍 전처리를 한 번에.
+"""AI Hub 음성 .tar(안에 .zip.partN)를 zip으로 복원하고 스트리밍 전처리까지 한 번에 돌린다.
 
-self-serve: 다운로드한 .tar 하나와 라벨 폴더만 주면 STT 클립을 뽑는다.
+다운로드한 .tar 하나랑 라벨 폴더만 주면 STT 클립이 나온다(self-serve).
 
   training/.venv/Scripts/python.exe data/prep_audio_tar.py \
       --tar "C:/Users/ysb21/Downloads/download (7).tar" \
       --labels data/raw_label_gs \
       --out data/processed_gs_big --max-clips 12000
 
-여러 지역을 한 매니페스트로 합칠 때는 2번째부터 --append 를 붙인다.
-zip 복원본은 temp에 만들고 끝나면 지운다(디스크 절약)."""
+여러 지역을 한 매니페스트로 합칠 땐 두 번째부터 --append를 붙인다.
+zip 복원본은 temp에 만들었다가 끝나면 지운다(디스크 절약)."""
 import argparse, glob, os, re, subprocess, sys, tarfile, tempfile, shutil
 
 try: sys.stdout.reconfigure(encoding="utf-8")
@@ -16,7 +16,7 @@ except Exception: pass
 
 
 def reconstruct_zip(tar_path, workdir):
-    """tar 안의 *.zip.partN 을 번호순으로 이어붙여 하나의 .zip 으로 복원. 단일 .zip 이면 그대로."""
+    """tar 안의 *.zip.partN을 번호순으로 이어붙여 하나의 .zip으로 복원한다. 이미 단일 .zip이면 그대로 쓴다."""
     print(f"[1/3] tar 풀기: {tar_path}")
     with tarfile.open(tar_path) as tf:
         tf.extractall(workdir)

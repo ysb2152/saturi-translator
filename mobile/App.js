@@ -24,8 +24,8 @@ import * as Network from 'expo-network';
 import { loadPipeline, runPipeline, convertText } from './src/ondevicePipeline';
 import { ensureModels, needsDownload } from './src/modelDownload';
 
-// 온디바이스 모델 경로 = 앱 내부 files 디렉터리(네이티브 fopen 항상 가능; scoped storage 무관).
-// 테스트: adb push→외부→run-as로 내부 복사. 배포: 첫 실행 다운로드→documentDirectory.
+// 모델 경로는 앱 내부 files 디렉터리를 쓴다(네이티브 fopen이 늘 되고 scoped storage도 안 걸림).
+// 테스트할 땐 adb push로 외부에 넣고 run-as로 내부에 복사, 배포할 땐 첫 실행에 받아서 documentDirectory에 둔다.
 const MODELS = {
   sttModel: `${documentDirectory}ggml-model-q5_0.bin`,
   encoder: `${documentDirectory}encoder.pte`,

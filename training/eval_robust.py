@@ -1,4 +1,4 @@
-"""실환경 강건성 테스트 — held-out 클립에 소음/코덱을 입혀 CER 변화 측정(녹음 불필요).
+"""held-out 클립에 소음이랑 전화 코덱을 입혀서 CER이 얼마나 나빠지는지 본다(실환경 강건성, 녹음 불필요).
 
   training/.venv/Scripts/python.exe training/eval_robust.py --model backend/models/whisper-dialect-lora --n 200
 """

@@ -22,7 +22,7 @@ def mb(p): return os.path.getsize(p) / 1e6
 
 # 1) int8 동적 양자화 (encoder + merged decoder)
 from onnxruntime.quantization import quantize_dynamic, QuantType
-# 비-merged 그래프를 양자화(merged는 If-노드 서브그래프라 동적 양자화가 못 들어감)
+# merged 그래프는 If-노드 서브그래프라 동적 양자화가 안 먹혀서, 비-merged 쪽을 양자화한다
 targets = ["encoder_model.onnx", "decoder_model.onnx", "decoder_with_past_model.onnx"]
 print("=== int8 동적 양자화 ===")
 for t in targets:
